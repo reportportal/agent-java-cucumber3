@@ -20,6 +20,7 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.HookTestStep;
@@ -79,12 +80,12 @@ public class Utils {
 
     }
 
-    public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description, Set<String> tags,
+    public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description, Set<ItemAttributesRQ> attributes,
                                                  String type) {
         StartTestItemRQ rq = new StartTestItemRQ();
         rq.setDescription(description);
         rq.setName(name);
-        rq.setTags(tags);
+        rq.setAttributes(attributes);
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(type);
 
@@ -97,7 +98,7 @@ public class Utils {
             public SaveLogRQ apply(String item) {
                 SaveLogRQ rq = new SaveLogRQ();
                 rq.setMessage(message);
-                rq.setTestItemId(item);
+                rq.setItemId(item);
                 rq.setLevel(level);
                 rq.setLogTime(Calendar.getInstance().getTime());
                 if (file != null) {
@@ -115,12 +116,12 @@ public class Utils {
      * @param tags - Cucumber tags
      * @return set of tags
      */
-    public static Set<String> extractPickleTags(List<PickleTag> tags) {
-        Set<String> returnTags = new HashSet<String>();
+    public static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
+        Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
         for (PickleTag tag : tags) {
-            returnTags.add(tag.getName());
+            attributes.add(new ItemAttributesRQ(null, tag.getName()));
         }
-        return returnTags;
+        return attributes;
     }
 
     /**
@@ -129,12 +130,12 @@ public class Utils {
      * @param tags - Cucumber tags
      * @return set of tags
      */
-    public static Set<String> extractTags(List<Tag> tags) {
-        Set<String> returnTags = new HashSet<String>();
+    public static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
+        Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
         for (Tag tag : tags) {
-            returnTags.add(tag.getName());
+            attributes.add(new ItemAttributesRQ(null, tag.getName()));
         }
-        return returnTags;
+        return attributes;
     }
 
     /**

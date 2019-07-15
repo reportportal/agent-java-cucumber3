@@ -15,6 +15,7 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.PickleStepTestStep;
 import cucumber.api.TestCase;
 import cucumber.api.TestStep;
@@ -43,7 +44,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import static com.epam.reportportal.cucumber.Utils.extractPickleTags;
-import static com.epam.reportportal.cucumber.Utils.extractTags;
+import static com.epam.reportportal.cucumber.Utils.extractAttributes;
 
 
 /**
@@ -62,10 +63,10 @@ public class RunningContext {
         private String currentFeatureUri;
         private Maybe<String> currentFeatureId;
         private Feature currentFeature;
-        private Set<String> tags;
+        private Set<ItemAttributesRQ> attributes;
 
         FeatureContext() {
-            tags = new HashSet<String>();
+            attributes = new HashSet<ItemAttributesRQ>();
         }
 
         static void addTestSourceReadEvent(String path, TestSourceRead event) {
@@ -88,7 +89,7 @@ public class RunningContext {
             TestSourceRead event = pathToReadEventMap.get(testCase.getUri());
             currentFeature = getFeature(event.source);
             currentFeatureUri = event.uri;
-            tags = extractTags(currentFeature.getTags());
+            attributes = extractAttributes(currentFeature.getTags());
             return this;
         }
 
@@ -118,8 +119,8 @@ public class RunningContext {
             return currentFeature;
         }
 
-        Set<String> getTags() {
-            return tags;
+        Set<ItemAttributesRQ> getAttributes() {
+            return attributes;
         }
 
         String getUri() {
@@ -168,14 +169,14 @@ public class RunningContext {
         private ScenarioDefinition scenario;
         private Queue<Step> backgroundSteps;
         private Map<Integer, Step> scenarioLocationMap;
-        private Set<String> tags;
+        private Set<ItemAttributesRQ> attributes;
         private TestCase testCase;
         private boolean hasBackground = false;
 
         ScenarioContext() {
             backgroundSteps = new ArrayDeque<Step>();
             scenarioLocationMap = new HashMap<Integer, Step>();
-            tags = new HashSet<String>();
+            attributes = new HashSet<ItemAttributesRQ>();
         }
 
         ScenarioContext processScenario(ScenarioDefinition scenario) {
@@ -211,7 +212,7 @@ public class RunningContext {
         }
 
         void processTags(List<PickleTag> pickleTags) {
-            tags = extractPickleTags(pickleTags);
+            attributes = extractPickleTags(pickleTags);
         }
 
         void mapBackgroundSteps(Background background) {
@@ -235,8 +236,8 @@ public class RunningContext {
             return scenario.getLocation().getLine();
         }
 
-        Set<String> getTags() {
-            return tags;
+        Set<ItemAttributesRQ> getAttributes() {
+            return attributes;
         }
 
         String getStepPrefix() {

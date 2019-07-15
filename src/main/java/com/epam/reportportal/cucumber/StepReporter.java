@@ -45,6 +45,9 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class StepReporter extends AbstractReporter {
+
+	public static final String METHOD_OPENING_BRACKET= "(";
+
     protected Maybe<String> currentStepId;
     protected Maybe<String> hookStepId;
     protected String hookStatus;
@@ -70,6 +73,8 @@ public class StepReporter extends AbstractReporter {
         rq.setDescription(Utils.buildMultilineArgument(testStep));
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType("STEP");
+        String codeLocation = testStep.getCodeLocation();
+        rq.setLocation(codeLocation.substring(0, codeLocation.indexOf(METHOD_OPENING_BRACKET)));
         currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
     }
 

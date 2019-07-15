@@ -141,7 +141,7 @@ public abstract class AbstractReporter implements Formatter {
                 currentFeatureContext.getFeatureId(),
                 Utils.buildNodeName(currentScenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, currentScenarioContext.getName(), currentScenarioContext.getOutlineIteration()),
                 currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
-                currentScenarioContext.getTags(),
+                currentScenarioContext.getAttributes(),
                 getScenarioTestItemType()
         );
         currentScenarioContext.setId(id);
@@ -163,7 +163,7 @@ public abstract class AbstractReporter implements Formatter {
         Maybe<String> root = getRootItemId();
         rq.setDescription(currentFeatureContext.getUri());
         rq.setName(Utils.buildNodeName(currentFeatureContext.getFeature().getKeyword(), AbstractReporter.COLON_INFIX, currentFeatureContext.getFeature().getName(), null));
-        rq.setTags(currentFeatureContext.getTags());
+        rq.setAttributes(currentFeatureContext.getAttributes());
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(getFeatureTestItemType());
         if (null == root) {
@@ -191,7 +191,7 @@ public abstract class AbstractReporter implements Formatter {
                 rq.setName(parameters.getLaunchName());
                 rq.setStartTime(startTime);
                 rq.setMode(parameters.getLaunchRunningMode());
-                rq.setTags(parameters.getTags());
+                rq.setAttributes(parameters.getAttributes());
                 rq.setDescription(parameters.getDescription());
 
                 Launch launch = reportPortal.newLaunch(rq);
