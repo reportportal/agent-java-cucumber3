@@ -46,8 +46,6 @@ import java.util.Calendar;
  */
 public class StepReporter extends AbstractReporter {
 
-	public static final String METHOD_OPENING_BRACKET= "(";
-
     protected Maybe<String> currentStepId;
     protected Maybe<String> hookStepId;
     protected String hookStatus;
@@ -65,18 +63,17 @@ public class StepReporter extends AbstractReporter {
         return null;
     }
 
-    @Override
-    protected void beforeStep(TestStep testStep) {
-        Step step = currentScenarioContext.getStep(testStep);
-        StartTestItemRQ rq = new StartTestItemRQ();
-        rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
-        rq.setDescription(Utils.buildMultilineArgument(testStep));
-        rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType("STEP");
-        String codeLocation = testStep.getCodeLocation();
-        rq.setLocation(codeLocation.substring(0, codeLocation.indexOf(METHOD_OPENING_BRACKET)));
-        currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
-    }
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		Step step = currentScenarioContext.getStep(testStep);
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		rq.setCodeRef(Utils.getCodeRef(testStep));
+		currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
+	}
 
     @Override
     protected void afterStep(Result result) {
