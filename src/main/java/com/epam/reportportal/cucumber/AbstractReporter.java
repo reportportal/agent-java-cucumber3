@@ -20,24 +20,11 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
-import cucumber.api.HookTestStep;
-import cucumber.api.HookType;
-import cucumber.api.Result;
-import cucumber.api.TestCase;
-import cucumber.api.TestStep;
-import cucumber.api.event.EmbedEvent;
-import cucumber.api.event.EventHandler;
-import cucumber.api.event.EventPublisher;
-import cucumber.api.event.TestCaseFinished;
-import cucumber.api.event.TestCaseStarted;
-import cucumber.api.event.TestRunFinished;
-import cucumber.api.event.TestRunStarted;
-import cucumber.api.event.TestSourceRead;
-import cucumber.api.event.TestStepFinished;
-import cucumber.api.event.TestStepStarted;
-import cucumber.api.event.WriteEvent;
+import cucumber.api.*;
+import cucumber.api.event.*;
 import cucumber.api.formatter.Formatter;
 import io.reactivex.Maybe;
 import org.apache.tika.mime.MimeTypeException;
@@ -50,6 +37,8 @@ import rp.com.google.common.base.Suppliers;
 import java.util.Calendar;
 import java.util.Date;
 
+import static rp.com.google.common.base.Strings.isNullOrEmpty;
+
 /**
  * Abstract Cucumber 3.x formatter for Report Portal
  *
@@ -60,373 +49,396 @@ import java.util.Date;
  */
 public abstract class AbstractReporter implements Formatter {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
-    protected static final String COLON_INFIX = ": ";
+	protected static final String COLON_INFIX = ": ";
 
-    /* feature context */
-    protected RunningContext.FeatureContext currentFeatureContext;
+	protected static final String SKIPPED_ISSUE_KEY = "skippedIssue";
 
-    /* scenario context */
-    protected RunningContext.ScenarioContext currentScenarioContext;
+	/* feature context */
+	protected RunningContext.FeatureContext currentFeatureContext;
 
-    protected Supplier<Launch> RP;
+	/* scenario context */
+	protected RunningContext.ScenarioContext currentScenarioContext;
 
-    /**
-     * Registers an event handler for a specific event.
-     * <p>
-     * The available events types are:
-     * <ul>
-     * <li>{@link TestRunStarted} - the first event sent.
-     * <li>{@link TestSourceRead} - sent for each feature file read, contains the feature file source.
-     * <li>{@link TestCaseStarted} - sent before starting the execution of a Test Case(/Pickle/Scenario), contains the Test Case
-     * <li>{@link TestStepStarted} - sent before starting the execution of a Test Step, contains the Test Step
-     * <li>{@link TestStepFinished} - sent after the execution of a Test Step, contains the Test Step and its Result.
-     * <li>{@link TestCaseFinished} - sent after the execution of a Test Case(/Pickle/Scenario), contains the Test Case and its Result.
-     * <li>{@link TestRunFinished} - the last event sent.
-     * <li>{@link EmbedEvent} - calling scenario.embed in a hook triggers this event.
-     * <li>{@link WriteEvent} - calling scenario.write in a hook triggers this event.
-     * </ul>
-     */
-    @Override
-    public void setEventPublisher(EventPublisher publisher) {
-        publisher.registerHandlerFor(TestRunStarted.class, getTestRunStartedHandler());
-        publisher.registerHandlerFor(TestSourceRead.class, getTestSourceReadHandler());
-        publisher.registerHandlerFor(TestCaseStarted.class, getTestCaseStartedHandler());
-        publisher.registerHandlerFor(TestStepStarted.class, getTestStepStartedHandler());
-        publisher.registerHandlerFor(TestStepFinished.class, getTestStepFinishedHandler());
-        publisher.registerHandlerFor(TestCaseFinished.class, getTestCaseFinishedHandler());
-        publisher.registerHandlerFor(TestRunFinished.class, getTestRunFinishedHandler());
-        publisher.registerHandlerFor(EmbedEvent.class, getEmbedEventHandler());
-        publisher.registerHandlerFor(WriteEvent.class, getWriteEventHandler());
-    }
+	protected Supplier<Launch> RP;
 
-    /**
-     * Manipulations before the launch starts
-     */
-    protected void beforeLaunch() {
-        startLaunch();
-    }
+	/**
+	 * Registers an event handler for a specific event.
+	 * <p>
+	 * The available events types are:
+	 * <ul>
+	 * <li>{@link TestRunStarted} - the first event sent.
+	 * <li>{@link TestSourceRead} - sent for each feature file read, contains the feature file source.
+	 * <li>{@link TestCaseStarted} - sent before starting the execution of a Test Case(/Pickle/Scenario), contains the Test Case
+	 * <li>{@link TestStepStarted} - sent before starting the execution of a Test Step, contains the Test Step
+	 * <li>{@link TestStepFinished} - sent after the execution of a Test Step, contains the Test Step and its Result.
+	 * <li>{@link TestCaseFinished} - sent after the execution of a Test Case(/Pickle/Scenario), contains the Test Case and its Result.
+	 * <li>{@link TestRunFinished} - the last event sent.
+	 * <li>{@link EmbedEvent} - calling scenario.embed in a hook triggers this event.
+	 * <li>{@link WriteEvent} - calling scenario.write in a hook triggers this event.
+	 * </ul>
+	 */
+	@Override
+	public void setEventPublisher(EventPublisher publisher) {
+		publisher.registerHandlerFor(TestRunStarted.class, getTestRunStartedHandler());
+		publisher.registerHandlerFor(TestSourceRead.class, getTestSourceReadHandler());
+		publisher.registerHandlerFor(TestCaseStarted.class, getTestCaseStartedHandler());
+		publisher.registerHandlerFor(TestStepStarted.class, getTestStepStartedHandler());
+		publisher.registerHandlerFor(TestStepFinished.class, getTestStepFinishedHandler());
+		publisher.registerHandlerFor(TestCaseFinished.class, getTestCaseFinishedHandler());
+		publisher.registerHandlerFor(TestRunFinished.class, getTestRunFinishedHandler());
+		publisher.registerHandlerFor(EmbedEvent.class, getEmbedEventHandler());
+		publisher.registerHandlerFor(WriteEvent.class, getWriteEventHandler());
+	}
 
-    /**
-     * Finish RP launch
-     */
-    protected void afterLaunch() {
-        FinishExecutionRQ finishLaunchRq = new FinishExecutionRQ();
-        finishLaunchRq.setEndTime(Calendar.getInstance().getTime());
-        RP.get().finish(finishLaunchRq);
-    }
+	/**
+	 * Manipulations before the launch starts
+	 */
+	protected void beforeLaunch() {
+		startLaunch();
+	}
 
-    /**
-     * Manipulations before the feature starts
-     */
-    protected void beforeFeature() {
-        System.out.println("beforeFeature()");
-        startFeature();
-    }
+	/**
+	 * Finish RP launch
+	 */
+	protected void afterLaunch() {
+		FinishExecutionRQ finishLaunchRq = new FinishExecutionRQ();
+		finishLaunchRq.setEndTime(Calendar.getInstance().getTime());
+		RP.get().finish(finishLaunchRq);
+	}
 
-    /**
-     * Finish Cucumber feature
-     */
-    protected void afterFeature() {
-        Utils.finishTestItem(RP.get(), currentFeatureContext.getFeatureId());
-        currentFeatureContext = null;
-    }
+	/**
+	 * Manipulations before the feature starts
+	 */
+	protected void beforeFeature() {
+		System.out.println("beforeFeature()");
+		startFeature();
+	}
 
-    /**
-     * Start Cucumber scenario
-     */
-    protected void beforeScenario() {
-        Maybe<String> id = Utils.startNonLeafNode(RP.get(),
-                currentFeatureContext.getFeatureId(),
-                Utils.buildNodeName(currentScenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, currentScenarioContext.getName(), currentScenarioContext.getOutlineIteration()),
-                currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
-                currentScenarioContext.getAttributes(),
-                getScenarioTestItemType()
-        );
-        currentScenarioContext.setId(id);
-    }
+	/**
+	 * Finish Cucumber feature
+	 */
+	protected void afterFeature() {
+		Utils.finishTestItem(RP.get(), currentFeatureContext.getFeatureId());
+		currentFeatureContext = null;
+	}
 
-    /**
-     * Finish Cucumber scenario
-     */
-    protected void afterScenario(TestCaseFinished event) {
-        Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
-        currentScenarioContext = null;
-    }
+	/**
+	 * Start Cucumber scenario
+	 */
+	protected void beforeScenario() {
+		Maybe<String> id = Utils.startNonLeafNode(
+				RP.get(),
+				currentFeatureContext.getFeatureId(),
+				Utils.buildNodeName(currentScenarioContext.getKeyword(),
+						AbstractReporter.COLON_INFIX,
+						currentScenarioContext.getName(),
+						currentScenarioContext.getOutlineIteration()
+				),
+				currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
+				currentScenarioContext.getAttributes(),
+				getScenarioTestItemType()
+		);
+		currentScenarioContext.setId(id);
+	}
 
-    /**
-     * Start Cucumber feature
-     */
-    protected void startFeature() {
-        StartTestItemRQ rq = new StartTestItemRQ();
-        Maybe<String> root = getRootItemId();
-        rq.setDescription(currentFeatureContext.getUri());
-        rq.setName(Utils.buildNodeName(currentFeatureContext.getFeature().getKeyword(), AbstractReporter.COLON_INFIX, currentFeatureContext.getFeature().getName(), null));
-        rq.setAttributes(currentFeatureContext.getAttributes());
-        rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType(getFeatureTestItemType());
-        if (null == root) {
-            currentFeatureContext.setFeatureId(RP.get().startTestItem(rq));
-        } else {
-            currentFeatureContext.setFeatureId(RP.get().startTestItem(root, rq));
-        }
-    }
+	/**
+	 * Finish Cucumber scenario
+	 */
+	protected void afterScenario(TestCaseFinished event) {
+		Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
+		currentScenarioContext = null;
+	}
 
-    /**
-     * Start RP launch
-     */
-    protected void startLaunch() {
-        RP = Suppliers.memoize(new Supplier<Launch>() {
+	/**
+	 * Start Cucumber feature
+	 */
+	protected void startFeature() {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		Maybe<String> root = getRootItemId();
+		rq.setDescription(currentFeatureContext.getUri());
+		rq.setName(Utils.buildNodeName(
+				currentFeatureContext.getFeature().getKeyword(),
+				AbstractReporter.COLON_INFIX,
+				currentFeatureContext.getFeature().getName(),
+				null
+		));
+		rq.setAttributes(currentFeatureContext.getAttributes());
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType(getFeatureTestItemType());
+		if (null == root) {
+			currentFeatureContext.setFeatureId(RP.get().startTestItem(rq));
+		} else {
+			currentFeatureContext.setFeatureId(RP.get().startTestItem(root, rq));
+		}
+	}
 
-            /* should no be lazy */
-            private final Date startTime = Calendar.getInstance().getTime();
+	/**
+	 * Start RP launch
+	 */
+	protected void startLaunch() {
+		RP = Suppliers.memoize(new Supplier<Launch>() {
 
-            @Override
-            public Launch get() {
-                final ReportPortal reportPortal = ReportPortal.builder().build();
-                ListenerParameters parameters = reportPortal.getParameters();
+			/* should no be lazy */
+			private final Date startTime = Calendar.getInstance().getTime();
 
-                StartLaunchRQ rq = new StartLaunchRQ();
-                rq.setName(parameters.getLaunchName());
-                rq.setStartTime(startTime);
-                rq.setMode(parameters.getLaunchRunningMode());
-                rq.setAttributes(parameters.getAttributes());
-                rq.setDescription(parameters.getDescription());
+			@Override
+			public Launch get() {
+				final ReportPortal reportPortal = ReportPortal.builder().build();
+				ListenerParameters parameters = reportPortal.getParameters();
 
-                Launch launch = reportPortal.newLaunch(rq);
-                return launch;
-            }
-        });
-    }
+				StartLaunchRQ rq = new StartLaunchRQ();
+				rq.setName(parameters.getLaunchName());
+				rq.setStartTime(startTime);
+				rq.setMode(parameters.getLaunchRunningMode());
+				rq.setAttributes(parameters.getAttributes());
+				rq.setRerun(parameters.isRerun());
+				if (!isNullOrEmpty(parameters.getRerunOf())) {
+					rq.setRerunOf(parameters.getRerunOf());
+				}
+				if (!isNullOrEmpty(parameters.getDescription())) {
+					rq.setDescription(parameters.getDescription());
+				}
+				if (null != parameters.getSkippedAnIssue()) {
+					ItemAttributesRQ skippedIssueAttribute = new ItemAttributesRQ();
+					skippedIssueAttribute.setKey(SKIPPED_ISSUE_KEY);
+					skippedIssueAttribute.setValue(parameters.getSkippedAnIssue().toString());
+					skippedIssueAttribute.setSystem(true);
+					rq.getAttributes().add(skippedIssueAttribute);
+				}
 
-    /**
-     * Start Cucumber step
-     *
-     * @param step Step object
-     */
-    protected abstract void beforeStep(TestStep step);
+                return reportPortal.newLaunch(rq);
+			}
+		});
+	}
 
-    /**
-     * Finish Cucumber step
-     *
-     * @param result Step result
-     */
-    protected abstract void afterStep(Result result);
+	/**
+	 * Start Cucumber step
+	 *
+	 * @param step Step object
+	 */
+	protected abstract void beforeStep(TestStep step);
 
-    /**
-     * Called when before/after-hooks are started
-     *
-     * @param isBefore - if true, before-hook is started, if false - after-hook
-     */
-    protected abstract void beforeHooks(Boolean isBefore);
+	/**
+	 * Finish Cucumber step
+	 *
+	 * @param result Step result
+	 */
+	protected abstract void afterStep(Result result);
 
-    /**
-     * Called when before/after-hooks are finished
-     *
-     * @param isBefore - if true, before-hook is finished, if false - after-hook
-     */
-    protected abstract void afterHooks(Boolean isBefore);
+	/**
+	 * Called when before/after-hooks are started
+	 *
+	 * @param isBefore - if true, before-hook is started, if false - after-hook
+	 */
+	protected abstract void beforeHooks(Boolean isBefore);
 
-    /**
-     * Called when a specific before/after-hook is finished
-     *
-     * @param step     TestStep object
-     * @param result   Hook result
-     * @param isBefore - if true, before-hook, if false - after-hook
-     */
-    protected abstract void hookFinished(TestStep step, Result result, Boolean isBefore);
+	/**
+	 * Called when before/after-hooks are finished
+	 *
+	 * @param isBefore - if true, before-hook is finished, if false - after-hook
+	 */
+	protected abstract void afterHooks(Boolean isBefore);
 
-    /**
-     * Return RP test item name mapped to Cucumber feature
-     *
-     * @return test item name
-     */
-    protected abstract String getFeatureTestItemType();
+	/**
+	 * Called when a specific before/after-hook is finished
+	 *
+	 * @param step     TestStep object
+	 * @param result   Hook result
+	 * @param isBefore - if true, before-hook, if false - after-hook
+	 */
+	protected abstract void hookFinished(TestStep step, Result result, Boolean isBefore);
 
-    /**
-     * Return RP test item name mapped to Cucumber scenario
-     *
-     * @return test item name
-     */
-    protected abstract String getScenarioTestItemType();
+	/**
+	 * Return RP test item name mapped to Cucumber feature
+	 *
+	 * @return test item name
+	 */
+	protected abstract String getFeatureTestItemType();
 
-    /**
-     * Report test item result and error (if present)
-     *
-     * @param result  - Cucumber result object
-     * @param message - optional message to be logged in addition
-     */
-    protected void reportResult(Result result, String message) {
-        String cukesStatus = result.getStatus().toString();
-        String level = Utils.mapLevel(cukesStatus);
-        String errorMessage = result.getErrorMessage();
-        if (errorMessage != null) {
-            Utils.sendLog(errorMessage, level, null);
-        }
-        if (message != null) {
-            Utils.sendLog(message, level, null);
-        }
-    }
+	/**
+	 * Return RP test item name mapped to Cucumber scenario
+	 *
+	 * @return test item name
+	 */
+	protected abstract String getScenarioTestItemType();
 
-    protected void embedding(String mimeType, byte[] data) {
-        File file = new File();
-        String embeddingName;
-        try {
-            embeddingName = MimeTypes.getDefaultMimeTypes().forName(mimeType).getType().getType();
-        } catch (MimeTypeException e) {
-            LOGGER.warn("Mime-type not found", e);
-            embeddingName = "embedding";
-        }
-        file.setName(embeddingName);
-        file.setContent(data);
-        Utils.sendLog(embeddingName, "UNKNOWN", file);
-    }
+	/**
+	 * Report test item result and error (if present)
+	 *
+	 * @param result  - Cucumber result object
+	 * @param message - optional message to be logged in addition
+	 */
+	protected void reportResult(Result result, String message) {
+		String cukesStatus = result.getStatus().toString();
+		String level = Utils.mapLevel(cukesStatus);
+		String errorMessage = result.getErrorMessage();
+		if (errorMessage != null) {
+			Utils.sendLog(errorMessage, level, null);
+		}
+		if (message != null) {
+			Utils.sendLog(message, level, null);
+		}
+	}
 
-    protected void write(String text) {
-        Utils.sendLog(text, "INFO", null);
-    }
+	protected void embedding(String mimeType, byte[] data) {
+		File file = new File();
+		String embeddingName;
+		try {
+			embeddingName = MimeTypes.getDefaultMimeTypes().forName(mimeType).getType().getType();
+		} catch (MimeTypeException e) {
+			LOGGER.warn("Mime-type not found", e);
+			embeddingName = "embedding";
+		}
+		file.setName(embeddingName);
+		file.setContent(data);
+		Utils.sendLog(embeddingName, "UNKNOWN", file);
+	}
 
-    protected boolean isBefore(TestStep step) {
-        return HookType.Before == ((HookTestStep) step).getHookType();
-    }
+	protected void write(String text) {
+		Utils.sendLog(text, "INFO", null);
+	}
 
-    protected abstract Maybe<String> getRootItemId();
+	protected boolean isBefore(TestStep step) {
+		return HookType.Before == ((HookTestStep) step).getHookType();
+	}
 
+	protected abstract Maybe<String> getRootItemId();
 
-    /**
-     * Private part that responsible for handling events
-     */
+	/**
+	 * Private part that responsible for handling events
+	 */
 
-    private EventHandler<TestRunStarted> getTestRunStartedHandler() {
-        return new EventHandler<TestRunStarted>() {
-            @Override
-            public void receive(TestRunStarted event) {
-                beforeLaunch();
-            }
-        };
-    }
+	private EventHandler<TestRunStarted> getTestRunStartedHandler() {
+		return new EventHandler<TestRunStarted>() {
+			@Override
+			public void receive(TestRunStarted event) {
+				beforeLaunch();
+			}
+		};
+	}
 
-    private EventHandler<TestSourceRead> getTestSourceReadHandler() {
-        return new EventHandler<TestSourceRead>() {
-            @Override
-            public void receive(TestSourceRead event) {
-                RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
-            }
-        };
-    }
+	private EventHandler<TestSourceRead> getTestSourceReadHandler() {
+		return new EventHandler<TestSourceRead>() {
+			@Override
+			public void receive(TestSourceRead event) {
+				RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
+			}
+		};
+	}
 
-    private EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
-        return new EventHandler<TestCaseStarted>() {
-            @Override
-            public void receive(TestCaseStarted event) {
-                handleStartOfTestCase(event);
-            }
-        };
-    }
+	private EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
+		return new EventHandler<TestCaseStarted>() {
+			@Override
+			public void receive(TestCaseStarted event) {
+				handleStartOfTestCase(event);
+			}
+		};
+	}
 
-    private EventHandler<TestStepStarted> getTestStepStartedHandler() {
-        return new EventHandler<TestStepStarted>() {
-            @Override
-            public void receive(TestStepStarted event) {
-                handleTestStepStarted(event);
-            }
-        };
-    }
+	private EventHandler<TestStepStarted> getTestStepStartedHandler() {
+		return new EventHandler<TestStepStarted>() {
+			@Override
+			public void receive(TestStepStarted event) {
+				handleTestStepStarted(event);
+			}
+		};
+	}
 
-    private EventHandler<TestStepFinished> getTestStepFinishedHandler() {
-        return new EventHandler<TestStepFinished>() {
-            @Override
-            public void receive(TestStepFinished event) {
-                handleTestStepFinished(event);
-            }
-        };
-    }
+	private EventHandler<TestStepFinished> getTestStepFinishedHandler() {
+		return new EventHandler<TestStepFinished>() {
+			@Override
+			public void receive(TestStepFinished event) {
+				handleTestStepFinished(event);
+			}
+		};
+	}
 
-    private EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
-        return new EventHandler<TestCaseFinished>() {
-            @Override
-            public void receive(TestCaseFinished event) {
-                afterScenario(event);
-            }
-        };
-    }
+	private EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
+		return new EventHandler<TestCaseFinished>() {
+			@Override
+			public void receive(TestCaseFinished event) {
+				afterScenario(event);
+			}
+		};
+	}
 
-    private EventHandler<TestRunFinished> getTestRunFinishedHandler() {
-        return new EventHandler<TestRunFinished>() {
-            @Override
-            public void receive(TestRunFinished event) {
-                if (currentFeatureContext != null) {
-                    handleEndOfFeature();
-                }
-                afterLaunch();
-            }
-        };
-    }
+	private EventHandler<TestRunFinished> getTestRunFinishedHandler() {
+		return new EventHandler<TestRunFinished>() {
+			@Override
+			public void receive(TestRunFinished event) {
+				if (currentFeatureContext != null) {
+					handleEndOfFeature();
+				}
+				afterLaunch();
+			}
+		};
+	}
 
-    private EventHandler<EmbedEvent> getEmbedEventHandler() {
-        return new EventHandler<EmbedEvent>() {
-            @Override
-            public void receive(EmbedEvent event) {
-                embedding(event.mimeType, event.data);
-            }
-        };
-    }
+	private EventHandler<EmbedEvent> getEmbedEventHandler() {
+		return new EventHandler<EmbedEvent>() {
+			@Override
+			public void receive(EmbedEvent event) {
+				embedding(event.mimeType, event.data);
+			}
+		};
+	}
 
-    private EventHandler<WriteEvent> getWriteEventHandler() {
-        return new EventHandler<WriteEvent>() {
-            @Override
-            public void receive(WriteEvent event) {
-                write(event.text);
-            }
-        };
-    }
+	private EventHandler<WriteEvent> getWriteEventHandler() {
+		return new EventHandler<WriteEvent>() {
+			@Override
+			public void receive(WriteEvent event) {
+				write(event.text);
+			}
+		};
+	}
 
-    private void handleStartOfFeature(TestCase testCase) {
-        currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
-        beforeFeature();
-    }
+	private void handleStartOfFeature(TestCase testCase) {
+		currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
+		beforeFeature();
+	}
 
-    private void handleEndOfFeature() {
-        afterFeature();
-    }
+	private void handleEndOfFeature() {
+		afterFeature();
+	}
 
-    private void handleStartOfTestCase(TestCaseStarted event) {
-        TestCase testCase = event.testCase;
-        if (currentFeatureContext != null && !testCase.getUri().equals(currentFeatureContext.getUri())) {
-            handleEndOfFeature();
-        }
-        if (currentFeatureContext == null) {
-            handleStartOfFeature(testCase);
-        }
-        if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
-            throw new IllegalStateException("Scenario URI does not match Feature URI.");
-        }
-        if (currentScenarioContext == null) {
-            currentScenarioContext = currentFeatureContext.getScenarioContext(testCase);
-        }
-        beforeScenario();
-    }
+	private void handleStartOfTestCase(TestCaseStarted event) {
+		TestCase testCase = event.testCase;
+		if (currentFeatureContext != null && !testCase.getUri().equals(currentFeatureContext.getUri())) {
+			handleEndOfFeature();
+		}
+		if (currentFeatureContext == null) {
+			handleStartOfFeature(testCase);
+		}
+		if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
+			throw new IllegalStateException("Scenario URI does not match Feature URI.");
+		}
+		if (currentScenarioContext == null) {
+			currentScenarioContext = currentFeatureContext.getScenarioContext(testCase);
+		}
+		beforeScenario();
+	}
 
-    private void handleTestStepStarted(TestStepStarted event) {
-        TestStep testStep = event.testStep;
-        if (testStep instanceof HookTestStep) {
-            beforeHooks(isBefore(testStep));
-        } else {
-            if (currentScenarioContext.withBackground()) {
-                currentScenarioContext.nextBackgroundStep();
-            }
-            beforeStep(testStep);
-        }
-    }
+	private void handleTestStepStarted(TestStepStarted event) {
+		TestStep testStep = event.testStep;
+		if (testStep instanceof HookTestStep) {
+			beforeHooks(isBefore(testStep));
+		} else {
+			if (currentScenarioContext.withBackground()) {
+				currentScenarioContext.nextBackgroundStep();
+			}
+			beforeStep(testStep);
+		}
+	}
 
-    private void handleTestStepFinished(TestStepFinished event) {
-        if (event.testStep instanceof HookTestStep) {
-            hookFinished(event.testStep, event.result, isBefore(event.testStep));
-            afterHooks(isBefore(event.testStep));
-        } else {
-            afterStep(event.result);
-        }
-    }
+	private void handleTestStepFinished(TestStepFinished event) {
+		if (event.testStep instanceof HookTestStep) {
+			hookFinished(event.testStep, event.result, isBefore(event.testStep));
+			afterHooks(isBefore(event.testStep));
+		} else {
+			afterStep(event.result);
+		}
+	}
 
 }
