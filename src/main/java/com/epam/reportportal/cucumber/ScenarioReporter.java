@@ -47,97 +47,101 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class ScenarioReporter extends AbstractReporter {
-    private static final String SEPARATOR = "-------------------------";
+	private static final String SEPARATOR = "-------------------------";
 
-    protected Supplier<Maybe<String>> rootSuiteId;
+	protected Supplier<Maybe<String>> rootSuiteId;
 
-    @Override
-    protected void beforeLaunch() {
-        super.beforeLaunch();
-        startRootItem();
-    }
+	@Override
+	protected void beforeLaunch() {
+		super.beforeLaunch();
+		startRootItem();
+	}
 
-    @Override
-    protected void beforeStep(TestStep testStep) {
-        Step step = currentScenarioContext.getStep(testStep);
-        String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
-        String multilineArg = Utils.buildMultilineArgument(testStep);
-        Utils.sendLog(decoratedStepName + multilineArg, "INFO", null);
-    }
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		Step step = currentScenarioContext.getStep(testStep);
+		String decoratedStepName = decorateMessage(Utils.buildNodeName(
+				currentScenarioContext.getStepPrefix(),
+				step.getKeyword(),
+				Utils.getStepName(testStep),
+				" "
+		));
+		String multilineArg = Utils.buildMultilineArgument(testStep);
+		Utils.sendLog(decoratedStepName + multilineArg, "INFO", null);
+	}
 
-    @Override
-    protected void afterStep(Result result) {
-        reportResult(result, decorateMessage("STEP " + result.getStatus().toString().toUpperCase()));
-    }
+	@Override
+	protected void afterStep(Result result) {
+		reportResult(result, decorateMessage("STEP " + result.getStatus().toString().toUpperCase()));
+	}
 
-    @Override
-    protected void beforeHooks(Boolean isBefore) {
-        // noop
-    }
+	@Override
+	protected void beforeHooks(Boolean isBefore) {
+		// noop
+	}
 
-    @Override
-    protected void afterHooks(Boolean isBefore) {
-        // noop
-    }
+	@Override
+	protected void afterHooks(Boolean isBefore) {
+		// noop
+	}
 
-    @Override
-    protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
-        reportResult(result, (isBefore ? "@Before" : "@After") + "\n" + step.getCodeLocation());
-    }
+	@Override
+	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "@Before" : "@After") + "\n" + step.getCodeLocation());
+	}
 
-    @Override
-    protected String getFeatureTestItemType() {
-        return "TEST";
-    }
+	@Override
+	protected String getFeatureTestItemType() {
+		return "TEST";
+	}
 
-    @Override
-    protected String getScenarioTestItemType() {
-        return "STEP";
-    }
+	@Override
+	protected String getScenarioTestItemType() {
+		return "STEP";
+	}
 
+	@Override
+	protected Maybe<String> getRootItemId() {
+		return rootSuiteId.get();
+	}
 
-    @Override
-    protected Maybe<String> getRootItemId() {
-        return rootSuiteId.get();
-    }
+	@Override
+	protected void afterLaunch() {
+		finishRootItem();
+		super.afterLaunch();
+	}
 
-    @Override
-    protected void afterLaunch() {
-        finishRootItem();
-        super.afterLaunch();
-    }
+	/**
+	 * Start root suite
+	 */
+	protected void finishRootItem() {
+		Utils.finishTestItem(RP.get(), rootSuiteId.get());
+		rootSuiteId = null;
+	}
 
-    /**
-     * Start root suite
-     */
-    protected void finishRootItem() {
-        Utils.finishTestItem(RP.get(), rootSuiteId.get());
-        rootSuiteId = null;
-    }
+	/**
+	 * Start root suite
+	 */
+	protected void startRootItem() {
+		rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
+			@Override
+			public Maybe<String> get() {
+				StartTestItemRQ rq = new StartTestItemRQ();
+				rq.setName("Root User Story");
+				rq.setStartTime(Calendar.getInstance().getTime());
+				rq.setType("STORY");
+				return RP.get().startTestItem(rq);
+			}
+		});
+	}
 
-    /**
-     * Start root suite
-     */
-    protected void startRootItem() {
-        rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
-            @Override
-            public Maybe<String> get() {
-                StartTestItemRQ rq = new StartTestItemRQ();
-                rq.setName("Root User Story");
-                rq.setStartTime(Calendar.getInstance().getTime());
-                rq.setType("STORY");
-                return RP.get().startTestItem(rq);
-            }
-        });
-    }
-
-    /**
-     * Add separators to log item to distinguish from real log messages
-     *
-     * @param message to decorate
-     * @return decorated message
-     */
-    private String decorateMessage(String message) {
-        return ScenarioReporter.SEPARATOR + message + ScenarioReporter.SEPARATOR;
-    }
+	/**
+	 * Add separators to log item to distinguish from real log messages
+	 *
+	 * @param message to decorate
+	 * @return decorated message
+	 */
+	private String decorateMessage(String message) {
+		return ScenarioReporter.SEPARATOR + message + ScenarioReporter.SEPARATOR;
+	}
 }
