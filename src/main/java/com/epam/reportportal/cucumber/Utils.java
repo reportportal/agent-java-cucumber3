@@ -16,9 +16,11 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.annotations.TestCaseId;
+import com.epam.reportportal.annotations.attribute.Attributes;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.utils.AttributeParser;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
@@ -225,6 +227,25 @@ class Utils {
 	}
 
 	@Nullable
+	public static Set<ItemAttributesRQ> getAttributes(TestStep testStep) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				Method method = retrieveMethod(definitionMatchField, testStep);
+				Attributes attributesAnnotation = method.getAnnotation(Attributes.class);
+				if (attributesAnnotation != null) {
+					return AttributeParser.retrieveAttributes(attributesAnnotation);
+				}
+			} catch (NoSuchFieldException e) {
+				return null;
+			} catch (IllegalAccessException e) {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	@Nullable
 	static String getCodeRef(TestStep testStep) {
 
 		Field definitionMatchField = getDefinitionMatchField(testStep);
@@ -261,13 +282,7 @@ class Utils {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 		if (definitionMatchField != null) {
 			try {
-				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
-				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
-				stepDefinitionField.setAccessible(true);
-				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
-				Field methodField = javaStepDefinition.getClass().getDeclaredField(METHOD_FIELD_NAME);
-				methodField.setAccessible(true);
-				Method method = (Method) methodField.get(javaStepDefinition);
+				Method method = retrieveMethod(definitionMatchField, testStep);
 				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
 				return testCaseIdAnnotation != null ?
 						getTestCaseId(testCaseIdAnnotation, method, ((PickleStepTestStep) testStep).getDefinitionArgument()) :
@@ -280,6 +295,16 @@ class Utils {
 		} else {
 			return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 		}
+	}
+
+	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep) throws NoSuchFieldException, IllegalAccessException {
+		StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+		Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
+		stepDefinitionField.setAccessible(true);
+		Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
+		Field methodField = javaStepDefinition.getClass().getDeclaredField(METHOD_FIELD_NAME);
+		methodField.setAccessible(true);
+		return  (Method) methodField.get(javaStepDefinition);
 	}
 
 	@Nullable
