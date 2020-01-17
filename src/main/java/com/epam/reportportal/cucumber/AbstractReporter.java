@@ -219,7 +219,7 @@ public abstract class AbstractReporter implements Formatter {
      *
      * @param isBefore - if true, before-hook is started, if false - after-hook
      */
-    protected abstract void beforeHooks(Boolean isBefore);
+    protected abstract void beforeHooks(TestStep testStep);
 
     /**
      * Called when before/after-hooks are finished
@@ -411,7 +411,7 @@ public abstract class AbstractReporter implements Formatter {
     private void handleTestStepStarted(TestStepStarted event) {
         TestStep testStep = event.testStep;
         if (testStep instanceof HookTestStep) {
-            beforeHooks(isBefore(testStep));
+            beforeHooks(testStep);
         } else {
             if (currentScenarioContext.withBackground()) {
                 currentScenarioContext.nextBackgroundStep();
