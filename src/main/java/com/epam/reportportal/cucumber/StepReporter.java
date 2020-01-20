@@ -17,6 +17,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
@@ -81,11 +82,11 @@ public class StepReporter extends AbstractReporter {
     }
 
     @Override
-    protected void beforeHooks(TestStep testStep) {
+    protected void beforeHooks(HookType hookType) {
         StartTestItemRQ rq = new StartTestItemRQ();
         String name = null;
         String type = null;
-        switch (testStep.getHookType()) {
+        switch (hookType) {
             case Before:
                 name = "Before hooks";
                 type = "BEFORE_TEST";
