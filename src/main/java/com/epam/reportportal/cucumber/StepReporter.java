@@ -59,18 +59,6 @@ public class StepReporter extends AbstractReporter {
 		hookStatus = null;
 	}
 
-	private String getType(RunningContext.FeatureContext context, Step step) {
-		if (context.getBackground() != null) {
-			if (context.getBackground().getSteps() == null) {
-				return "STEP";
-			} else {
-				return context.getBackground().getSteps().contains(step) ? "BEFORE_TEST" : "STEP";
-			}
-		} else {
-			return "STEP";
-		}
-	}
-
 	@Override
 	protected Maybe<String> getRootItemId() {
 		return null;
@@ -83,7 +71,7 @@ public class StepReporter extends AbstractReporter {
 		rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
 		rq.setDescription(Utils.buildMultilineArgument(testStep));
 		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType(getType(currentFeatureContext, step));
+		rq.setType("STEP");
 		String codeRef = Utils.getCodeRef(testStep);
 		rq.setCodeRef(codeRef);
 		TestCaseIdEntry testCaseIdEntry = Utils.getTestCaseId(testStep, codeRef);
