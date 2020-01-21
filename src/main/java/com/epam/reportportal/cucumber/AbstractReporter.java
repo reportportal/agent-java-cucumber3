@@ -208,7 +208,7 @@ public abstract class AbstractReporter implements Formatter {
 					rq.getAttributes().add(skippedIssueAttribute);
 				}
 
-                return reportPortal.newLaunch(rq);
+				return reportPortal.newLaunch(rq);
 			}
 		});
 	}
@@ -229,10 +229,8 @@ public abstract class AbstractReporter implements Formatter {
 
 	/**
 	 * Called when before/after-hooks are started
-	 *
-	 * @param isBefore - if true, before-hook is started, if false - after-hook
 	 */
-	protected abstract void beforeHooks(Boolean isBefore);
+	protected abstract void beforeHooks(HookType hookType);
 
 	/**
 	 * Called when before/after-hooks are finished
@@ -423,7 +421,7 @@ public abstract class AbstractReporter implements Formatter {
 	private void handleTestStepStarted(TestStepStarted event) {
 		TestStep testStep = event.testStep;
 		if (testStep instanceof HookTestStep) {
-			beforeHooks(isBefore(testStep));
+			beforeHooks(testStep.getHookType());
 		} else {
 			if (currentScenarioContext.withBackground()) {
 				currentScenarioContext.nextBackgroundStep();

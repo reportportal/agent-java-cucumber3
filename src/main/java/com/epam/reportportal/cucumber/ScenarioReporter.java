@@ -16,6 +16,7 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
@@ -60,8 +61,7 @@ public class ScenarioReporter extends AbstractReporter {
 	@Override
 	protected void beforeStep(TestStep testStep) {
 		Step step = currentScenarioContext.getStep(testStep);
-		String decoratedStepName = decorateMessage(Utils.buildNodeName(
-				currentScenarioContext.getStepPrefix(),
+		String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
 				step.getKeyword(),
 				Utils.getStepName(testStep),
 				" "
@@ -76,7 +76,7 @@ public class ScenarioReporter extends AbstractReporter {
 	}
 
 	@Override
-	protected void beforeHooks(Boolean isBefore) {
+	protected void beforeHooks(HookType hookType) {
 		// noop
 	}
 
