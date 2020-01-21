@@ -207,7 +207,6 @@ public abstract class AbstractReporter implements Formatter {
 					skippedIssueAttribute.setSystem(true);
 					rq.getAttributes().add(skippedIssueAttribute);
 				}
-
 				return reportPortal.newLaunch(rq);
 			}
 		});
