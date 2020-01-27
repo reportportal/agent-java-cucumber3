@@ -19,8 +19,8 @@ dependencies {
         compile 'com.epam.reportportal:client-java:5.0.0-BETA-7'
         compile 'com.epam.reportportal:commons-model:5.0.0'
     } else {
-        compile 'com.github.reportportal:client-java:3faa232'
-        compile 'com.github.reportportal:commons-model:81537ec'
+        compile 'com.github.reportportal:client-java:5.0.0-BETA-7'
+        compile 'com.github.reportportal:commons-model:5.0.0'
     }
     compile 'io.cucumber:cucumber-java:3.0.2'
 }
