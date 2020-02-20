@@ -103,6 +103,15 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	/**
+	 * Extension point to customize ReportPortal instance
+	 *
+	 * @return ReportPortal
+	 */
+	protected ReportPortal buildReportPortal() {
+		return ReportPortal.builder().build();
+	}
+
+	/**
 	 * Finish RP launch
 	 */
 	protected void afterLaunch() {
@@ -186,7 +195,7 @@ public abstract class AbstractReporter implements Formatter {
 
 			@Override
 			public Launch get() {
-				final ReportPortal reportPortal = ReportPortal.builder().build();
+				final ReportPortal reportPortal = buildReportPortal();
 				ListenerParameters parameters = reportPortal.getParameters();
 
 				StartLaunchRQ rq = new StartLaunchRQ();
