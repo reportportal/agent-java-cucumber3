@@ -24,6 +24,7 @@ import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
+import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
@@ -41,11 +42,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
+import rp.com.google.common.collect.Lists;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 class Utils {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -56,6 +61,7 @@ class Utils {
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String METHOD_FIELD_NAME = "method";
+	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
 	//@formatter:off
 	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
@@ -297,6 +303,25 @@ class Utils {
 		} else {
 			return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 		}
+	}
+
+	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
+		List<ParameterResource> parameters = Lists.newArrayList();
+		Optional<String> parameterName = Optional.empty();
+		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
+		if (matcher.find()) {
+			parameterName = Optional.of(text.substring(matcher.start() + 1, matcher.end() - 1));
+		}
+		if (!arguments.isEmpty() && parameterName.isPresent()) {
+			String key = parameterName.get();
+			parameters.addAll(arguments.stream().map(it -> {
+				ParameterResource parameterResource = new ParameterResource();
+				parameterResource.setKey(key);
+				parameterResource.setValue(it.getValue());
+				return parameterResource;
+			}).collect(Collectors.toList()));
+		}
+		return parameters;
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
