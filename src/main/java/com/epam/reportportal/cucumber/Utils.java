@@ -50,7 +50,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 class Utils {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -244,9 +244,7 @@ class Utils {
 				if (attributesAnnotation != null) {
 					return AttributeParser.retrieveAttributes(attributesAnnotation);
 				}
-			} catch (NoSuchFieldException e) {
-				return null;
-			} catch (IllegalAccessException e) {
+			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return null;
 			}
 		}
@@ -269,13 +267,7 @@ class Utils {
 				getLocationMethod.setAccessible(true);
 				String fullCodeRef = String.valueOf(getLocationMethod.invoke(javaStepDefinition, true));
 				return !"null".equals(fullCodeRef) ? fullCodeRef.substring(0, fullCodeRef.indexOf(METHOD_OPENING_BRACKET)) : null;
-			} catch (NoSuchFieldException e) {
-				return null;
-			} catch (NoSuchMethodException e) {
-				return null;
-			} catch (IllegalAccessException e) {
-				return null;
-			} catch (InvocationTargetException e) {
+			} catch (NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
 				return null;
 			}
 
@@ -295,9 +287,7 @@ class Utils {
 				return testCaseIdAnnotation != null ?
 						getTestCaseId(testCaseIdAnnotation, method, ((PickleStepTestStep) testStep).getDefinitionArgument()) :
 						getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-			} catch (NoSuchFieldException e) {
-				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-			} catch (IllegalAccessException e) {
+			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 			}
 		} else {
@@ -307,20 +297,21 @@ class Utils {
 
 	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
-		Optional<String> parameterName = Optional.empty();
+		ArrayList<String> parameterNames = Lists.newArrayList();
 		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
-		if (matcher.find()) {
-			parameterName = Optional.of(text.substring(matcher.start() + 1, matcher.end() - 1));
+		while (matcher.find()) {
+			parameterNames.add(text.substring(matcher.start() + 1, matcher.end() - 1));
 		}
-		if (!arguments.isEmpty() && parameterName.isPresent()) {
-			String key = parameterName.get();
-			parameters.addAll(arguments.stream().map(it -> {
+		IntStream.range(0, parameterNames.size()).forEach(index -> {
+			String parameterName = parameterNames.get(index);
+			if (index < arguments.size()) {
+				String parameterValue = arguments.get(index).getValue();
 				ParameterResource parameterResource = new ParameterResource();
-				parameterResource.setKey(key);
-				parameterResource.setValue(it.getValue());
-				return parameterResource;
-			}).collect(Collectors.toList()));
-		}
+				parameterResource.setKey(parameterName);
+				parameterResource.setValue(parameterValue);
+				parameters.add(parameterResource);
+			}
+		});
 		return parameters;
 	}
 
