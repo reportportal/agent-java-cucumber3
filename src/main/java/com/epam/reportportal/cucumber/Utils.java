@@ -24,6 +24,7 @@ import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
+import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
@@ -41,11 +42,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
+import rp.com.google.common.collect.Lists;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 class Utils {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -56,6 +61,7 @@ class Utils {
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String METHOD_FIELD_NAME = "method";
+	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
 	//@formatter:off
 	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
@@ -238,9 +244,7 @@ class Utils {
 				if (attributesAnnotation != null) {
 					return AttributeParser.retrieveAttributes(attributesAnnotation);
 				}
-			} catch (NoSuchFieldException e) {
-				return null;
-			} catch (IllegalAccessException e) {
+			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return null;
 			}
 		}
@@ -263,13 +267,7 @@ class Utils {
 				getLocationMethod.setAccessible(true);
 				String fullCodeRef = String.valueOf(getLocationMethod.invoke(javaStepDefinition, true));
 				return !"null".equals(fullCodeRef) ? fullCodeRef.substring(0, fullCodeRef.indexOf(METHOD_OPENING_BRACKET)) : null;
-			} catch (NoSuchFieldException e) {
-				return null;
-			} catch (NoSuchMethodException e) {
-				return null;
-			} catch (IllegalAccessException e) {
-				return null;
-			} catch (InvocationTargetException e) {
+			} catch (NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
 				return null;
 			}
 
@@ -289,14 +287,32 @@ class Utils {
 				return testCaseIdAnnotation != null ?
 						getTestCaseId(testCaseIdAnnotation, method, ((PickleStepTestStep) testStep).getDefinitionArgument()) :
 						getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-			} catch (NoSuchFieldException e) {
-				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-			} catch (IllegalAccessException e) {
+			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 			}
 		} else {
 			return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 		}
+	}
+
+	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
+		List<ParameterResource> parameters = Lists.newArrayList();
+		ArrayList<String> parameterNames = Lists.newArrayList();
+		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
+		while (matcher.find()) {
+			parameterNames.add(text.substring(matcher.start() + 1, matcher.end() - 1));
+		}
+		IntStream.range(0, parameterNames.size()).forEach(index -> {
+			String parameterName = parameterNames.get(index);
+			if (index < arguments.size()) {
+				String parameterValue = arguments.get(index).getValue();
+				ParameterResource parameterResource = new ParameterResource();
+				parameterResource.setKey(parameterName);
+				parameterResource.setValue(parameterValue);
+				parameters.add(parameterResource);
+			}
+		});
+		return parameters;
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
