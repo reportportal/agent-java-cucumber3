@@ -66,6 +66,14 @@ public abstract class AbstractReporter implements Formatter {
 
 	protected Supplier<Launch> RP;
 
+	protected void setCurrentFeatureContext(RunningContext.FeatureContext currentFeatureContext) {
+		this.currentFeatureContext = currentFeatureContext;
+	}
+
+	protected void setCurrentScenarioContext(RunningContext.ScenarioContext currentScenarioContext) {
+		this.currentScenarioContext = currentScenarioContext;
+	}
+
 	/**
 	 * Registers an event handler for a specific event.
 	 * <p>
