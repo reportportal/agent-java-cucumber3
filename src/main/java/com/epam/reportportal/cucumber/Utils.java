@@ -347,9 +347,9 @@ class Utils {
 				.orElseGet(() -> new TestCaseIdEntry(codeRef));
 	}
 
-	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = it -> "[" + it.stream()
+	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = it -> it.stream()
 			.map(cucumber.api.Argument::getValue)
-			.collect(Collectors.joining(",")) + "]";
+			.collect(Collectors.joining(",", "[", "]"));
 
 	@Nullable
 	private static Field getDefinitionMatchField(TestStep testStep) {
