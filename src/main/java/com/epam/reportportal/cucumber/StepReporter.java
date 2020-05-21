@@ -16,15 +16,14 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
-import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
-import cucumber.api.HookType;
-import cucumber.api.Result;
-import cucumber.api.TestStep;
+import cucumber.api.*;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
 
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Cucumber reporter for ReportPortal that reports individual steps as test
@@ -72,13 +71,13 @@ public class StepReporter extends AbstractReporter {
 		rq.setDescription(Utils.buildMultilineArgument(testStep));
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType("STEP");
+		List<Argument> arguments = testStep instanceof PickleStepTestStep ?
+				((PickleStepTestStep) testStep).getDefinitionArgument() :
+				Collections.emptyList();
+		rq.setParameters(Utils.getParameters(arguments, step.getText()));
 		String codeRef = Utils.getCodeRef(testStep);
 		rq.setCodeRef(codeRef);
-		TestCaseIdEntry testCaseIdEntry = Utils.getTestCaseId(testStep, codeRef);
-		if (testCaseIdEntry != null) {
-			rq.setTestCaseId(testCaseIdEntry.getId());
-			rq.setTestCaseHash(testCaseIdEntry.getHash());
-		}
+		rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef).getId());
 		rq.setAttributes(Utils.getAttributes(testStep));
 		currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
 	}
