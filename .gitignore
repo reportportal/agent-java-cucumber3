@@ -29,4 +29,5 @@ build/
 
 # IntelliJ Idea files
 .idea/
+out/
 *.iml
