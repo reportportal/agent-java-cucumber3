@@ -18,7 +18,6 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.annotations.attribute.Attributes;
 import com.epam.reportportal.listeners.ItemStatus;
-import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
@@ -81,7 +80,6 @@ class Utils {
 		throw new AssertionError("No instances should exist for the class!");
 	}
 
-
 	/**
 	 * Map Cucumber statuses to RP item statuses
 	 *
@@ -93,7 +91,10 @@ class Utils {
 			return null;
 		} else {
 			if (STATUS_MAPPING.get(status) == null) {
-				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.", status));
+				LOGGER.error(String.format(
+						"Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+						status
+				));
 				return ItemStatus.SKIPPED.name();
 			}
 			return STATUS_MAPPING.get(status).name();
@@ -311,7 +312,8 @@ class Utils {
 				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(testCaseIdAnnotation,
 						method,
 						((PickleStepTestStep) testStep).getDefinitionArgument()
-				))).orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
+				)))
+						.orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
 			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 			}
