@@ -168,7 +168,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * Finish Cucumber scenario
 	 */
 	protected void afterScenario(TestCaseFinished event) {
-		Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
+		Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus());
 		currentScenarioContext = null;
 	}
 
