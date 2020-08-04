@@ -44,6 +44,7 @@ import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
 import rp.com.google.common.collect.Lists;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -101,28 +102,38 @@ class Utils {
 		}
 	}
 
-	static void finishTestItem(Launch rp, Maybe<String> itemId) {
-		finishTestItem(rp, itemId, null);
-	}
-
-	static void finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
+	static void finishFeature(Launch rp, Maybe<String> itemId, Date dateTime) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
 		}
-
 		FinishTestItemRQ rq = new FinishTestItemRQ();
-		rq.setStatus(mapItemStatus(status));
-		rq.setEndTime(Calendar.getInstance().getTime());
-
+		rq.setEndTime(dateTime);
 		rp.finishTestItem(itemId, rq);
-
 	}
 
-	static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
+	static void finishTestItem(Launch rp, Maybe<String> itemId) {
+		finishTestItem(rp, itemId, null);
+	}
+
+	static Date finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
+		if (itemId == null) {
+			LOGGER.error("BUG: Trying to finish unspecified test item.");
+			return null;
+		}
+		FinishTestItemRQ rq = new FinishTestItemRQ();
+		rq.setStatus(mapItemStatus(status));
+		Date currentDate = Calendar.getInstance().getTime();
+		rq.setEndTime(Calendar.getInstance().getTime());
+		rp.finishTestItem(itemId, rq);
+		return currentDate;
+	}
+
+	static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description, String codeRef,
 			Set<ItemAttributesRQ> attributes, String type) {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setDescription(description);
+		rq.setCodeRef(codeRef);
 		rq.setName(name);
 		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
@@ -397,5 +408,15 @@ class Utils {
 
 			return null;
 		}
+	}
+
+	@Nonnull
+	public static String getDescription(@Nonnull String uri) {
+		return uri;
+	}
+
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		return uri + ":" + line;
 	}
 }

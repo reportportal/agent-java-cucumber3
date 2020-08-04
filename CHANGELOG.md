@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- codeRef reporting was added for every item in an item tree
 
 ## [5.0.0-BETA-12]
 ### Fixed
