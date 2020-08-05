@@ -92,8 +92,7 @@ class Utils {
 			return null;
 		} else {
 			if (STATUS_MAPPING.get(status) == null) {
-				LOGGER.error(String.format(
-						"Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
 						status
 				));
 				return ItemStatus.SKIPPED.name();
@@ -143,19 +142,16 @@ class Utils {
 	}
 
 	static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(new Function<String, SaveLogRQ>() {
-			@Override
-			public SaveLogRQ apply(String itemUuid) {
-				SaveLogRQ rq = new SaveLogRQ();
-				rq.setMessage(message);
-				rq.setItemUuid(itemUuid);
-				rq.setLevel(level);
-				rq.setLogTime(Calendar.getInstance().getTime());
-				if (file != null) {
-					rq.setFile(file);
-				}
-				return rq;
+		ReportPortal.emitLog((Function<String, SaveLogRQ>) itemUuid -> {
+			SaveLogRQ rq = new SaveLogRQ();
+			rq.setMessage(message);
+			rq.setItemUuid(itemUuid);
+			rq.setLevel(level);
+			rq.setLogTime(Calendar.getInstance().getTime());
+			if (file != null) {
+				rq.setFile(file);
 			}
+			return rq;
 		});
 	}
 
@@ -166,7 +162,7 @@ class Utils {
 	 * @return set of tags
 	 */
 	static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (PickleTag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -180,7 +176,7 @@ class Utils {
 	 * @return set of tags
 	 */
 	static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -194,15 +190,13 @@ class Utils {
 	 * @return regular log level
 	 */
 	static String mapLevel(String cukesStatus) {
-		String mapped = null;
 		if (cukesStatus.equalsIgnoreCase("passed")) {
-			mapped = "INFO";
+			return "INFO";
 		} else if (cukesStatus.equalsIgnoreCase("skipped")) {
-			mapped = "WARN";
+			return "WARN";
 		} else {
-			mapped = "ERROR";
+			return "ERROR";
 		}
-		return mapped;
 	}
 
 	/**
@@ -367,7 +361,7 @@ class Utils {
 	@Nullable
 	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.api.Argument> arguments) {
 		if (testCaseId.parametrized()) {
-			List<String> values = new ArrayList<String>(arguments.size());
+			List<String> values = new ArrayList<>(arguments.size());
 			for (cucumber.api.Argument argument : arguments) {
 				values.add(argument.getValue());
 			}
@@ -377,15 +371,15 @@ class Utils {
 		}
 	}
 
+	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = args -> ofNullable(args).map(a -> a.stream()
+			.map(cucumber.api.Argument::getValue)
+			.collect(Collectors.joining(",", "[", "]"))).orElse("");
+
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.api.Argument> arguments) {
 		return ofNullable(arguments).filter(args -> !args.isEmpty())
 				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
 				.orElseGet(() -> new TestCaseIdEntry(codeRef));
 	}
-
-	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = it -> it.stream()
-			.map(cucumber.api.Argument::getValue)
-			.collect(Collectors.joining(",", "[", "]"));
 
 	@Nullable
 	private static Field getDefinitionMatchField(TestStep testStep) {
