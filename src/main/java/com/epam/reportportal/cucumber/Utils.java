@@ -44,6 +44,7 @@ import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
 import rp.com.google.common.collect.Lists;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -91,8 +92,7 @@ class Utils {
 			return null;
 		} else {
 			if (STATUS_MAPPING.get(status) == null) {
-				LOGGER.error(String.format(
-						"Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
 						status
 				));
 				return ItemStatus.SKIPPED.name();
@@ -101,50 +101,60 @@ class Utils {
 		}
 	}
 
-	static void finishTestItem(Launch rp, Maybe<String> itemId) {
-		finishTestItem(rp, itemId, null);
-	}
-
-	static void finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
+	static void finishFeature(Launch rp, Maybe<String> itemId, Date dateTime) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
 		}
-
 		FinishTestItemRQ rq = new FinishTestItemRQ();
-		rq.setStatus(mapItemStatus(status));
-		rq.setEndTime(Calendar.getInstance().getTime());
-
+		rq.setEndTime(dateTime);
 		rp.finishTestItem(itemId, rq);
-
 	}
 
-	static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
+	static void finishTestItem(Launch rp, Maybe<String> itemId) {
+		finishTestItem(rp, itemId, null);
+	}
+
+	static Date finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
+		if (itemId == null) {
+			LOGGER.error("BUG: Trying to finish unspecified test item.");
+			return null;
+		}
+		FinishTestItemRQ rq = new FinishTestItemRQ();
+		rq.setStatus(mapItemStatus(status));
+		Date currentDate = Calendar.getInstance().getTime();
+		rq.setEndTime(Calendar.getInstance().getTime());
+		rp.finishTestItem(itemId, rq);
+		return currentDate;
+	}
+
+	static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description, String codeRef,
 			Set<ItemAttributesRQ> attributes, String type) {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setDescription(description);
+		rq.setCodeRef(codeRef);
 		rq.setName(name);
 		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
+		if ("STEP".equals(type)) {
+			rq.setTestCaseId(TestCaseIdUtils.getTestCaseId(codeRef, null).getId());
+		}
 
 		return rp.startTestItem(rootItemId, rq);
 	}
 
 	static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(new Function<String, SaveLogRQ>() {
-			@Override
-			public SaveLogRQ apply(String itemUuid) {
-				SaveLogRQ rq = new SaveLogRQ();
-				rq.setMessage(message);
-				rq.setItemUuid(itemUuid);
-				rq.setLevel(level);
-				rq.setLogTime(Calendar.getInstance().getTime());
-				if (file != null) {
-					rq.setFile(file);
-				}
-				return rq;
+		ReportPortal.emitLog((Function<String, SaveLogRQ>) itemUuid -> {
+			SaveLogRQ rq = new SaveLogRQ();
+			rq.setMessage(message);
+			rq.setItemUuid(itemUuid);
+			rq.setLevel(level);
+			rq.setLogTime(Calendar.getInstance().getTime());
+			if (file != null) {
+				rq.setFile(file);
 			}
+			return rq;
 		});
 	}
 
@@ -155,7 +165,7 @@ class Utils {
 	 * @return set of tags
 	 */
 	static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (PickleTag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -169,7 +179,7 @@ class Utils {
 	 * @return set of tags
 	 */
 	static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -183,15 +193,13 @@ class Utils {
 	 * @return regular log level
 	 */
 	static String mapLevel(String cukesStatus) {
-		String mapped = null;
 		if (cukesStatus.equalsIgnoreCase("passed")) {
-			mapped = "INFO";
+			return "INFO";
 		} else if (cukesStatus.equalsIgnoreCase("skipped")) {
-			mapped = "WARN";
+			return "WARN";
 		} else {
-			mapped = "ERROR";
+			return "ERROR";
 		}
-		return mapped;
 	}
 
 	/**
@@ -303,25 +311,6 @@ class Utils {
 
 	}
 
-	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
-		if (definitionMatchField != null) {
-			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
-				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
-				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(testCaseIdAnnotation,
-						method,
-						((PickleStepTestStep) testStep).getDefinitionArgument()
-				)))
-						.orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
-			} catch (NoSuchFieldException | IllegalAccessException e) {
-				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-			}
-		} else {
-			return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-		}
-	}
-
 	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
 		ArrayList<String> parameterNames = Lists.newArrayList();
@@ -353,28 +342,31 @@ class Utils {
 		return (Method) methodField.get(javaStepDefinition);
 	}
 
-	@Nullable
-	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.api.Argument> arguments) {
-		if (testCaseId.parametrized()) {
-			List<String> values = new ArrayList<String>(arguments.size());
-			for (cucumber.api.Argument argument : arguments) {
-				values.add(argument.getValue());
+	private static final java.util.function.Function<List<cucumber.api.Argument>, List<?>> ARGUMENTS_TRANSFORM = arguments -> ofNullable(
+			arguments).map(args -> args.stream().map(cucumber.api.Argument::getValue).collect(Collectors.toList())).orElse(null);
+
+	@SuppressWarnings("unchecked")
+	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		List<cucumber.api.Argument> arguments = ((PickleStepTestStep) testStep).getDefinitionArgument();
+		if (definitionMatchField != null) {
+			try {
+				Method method = retrieveMethod(definitionMatchField, testStep);
+				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
+						method,
+						codeRef,
+						(List<Object>) ARGUMENTS_TRANSFORM.apply(arguments)
+				);
+			} catch (NoSuchFieldException | IllegalAccessException ignore) {
 			}
-			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
-		} else {
-			return new TestCaseIdEntry(testCaseId.value());
 		}
+		return getTestCaseId(codeRef, arguments);
 	}
 
+	@SuppressWarnings({ "unchecked" })
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.api.Argument> arguments) {
-		return ofNullable(arguments).filter(args -> !args.isEmpty())
-				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
-				.orElseGet(() -> new TestCaseIdEntry(codeRef));
+		return TestCaseIdUtils.getTestCaseId(codeRef, (List<Object>) ARGUMENTS_TRANSFORM.apply(arguments));
 	}
-
-	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = it -> it.stream()
-			.map(cucumber.api.Argument::getValue)
-			.collect(Collectors.joining(",", "[", "]"));
 
 	@Nullable
 	private static Field getDefinitionMatchField(TestStep testStep) {
@@ -397,5 +389,15 @@ class Utils {
 
 			return null;
 		}
+	}
+
+	@Nonnull
+	public static String getDescription(@Nonnull String uri) {
+		return uri;
+	}
+
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		return uri + ":" + line;
 	}
 }
