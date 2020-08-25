@@ -1,7 +1,9 @@
 package com.epam.reportportal.cucumber.integration.hooks;
 
 import cucumber.api.java.After;
+import cucumber.api.java.AfterStep;
 import cucumber.api.java.Before;
+import cucumber.api.java.BeforeStep;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import org.slf4j.Logger;
@@ -13,6 +15,16 @@ public class EmptySteps {
 	@Before
 	public void my_before_hook() {
 		LOGGER.info("Inside 'my_before_hook'");
+	}
+
+	@BeforeStep
+	public void my_before_step_hook() {
+		LOGGER.info("Inside 'my_before_step_hook'");
+	}
+
+	@AfterStep
+	public void my_after_step_hook() {
+		LOGGER.info("Inside 'my_after_step_hook'");
 	}
 
 	@Given("I have empty step")
