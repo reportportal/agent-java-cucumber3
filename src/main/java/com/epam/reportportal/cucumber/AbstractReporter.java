@@ -133,8 +133,8 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Start Cucumber scenario
 	 */
-	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext context,
-			String scenarioName) {
+	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext,
+			RunningContext.ScenarioContext context, String scenarioName) {
 		String description = getDescription(currentFeatureContext.getUri());
 		String codeRef = getCodeRef(currentFeatureContext.getUri(), context.getLine());
 		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
@@ -390,15 +390,15 @@ public abstract class AbstractReporter implements Formatter {
 		);
 
 		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), currentFeatureContext.getUri());
-		RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
+		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
 
-		if (currentScenarioContext == null) {
-			currentScenarioContext = currentFeatureContext.getScenarioContext(testCase);
-			currentScenarioContextMap.put(scenarioNameFeatureURI, currentScenarioContext);
-			this.currentScenarioContext.set(currentScenarioContext);
+		if (scenarioContext == null) {
+			scenarioContext = currentFeatureContext.getScenarioContext(testCase);
+			currentScenarioContextMap.put(scenarioNameFeatureURI, scenarioContext);
+			currentScenarioContext.set(scenarioContext);
 		}
 
-		beforeScenario(currentFeatureContext, currentScenarioContext, scenarioName);
+		beforeScenario(currentFeatureContext, scenarioContext, scenarioName);
 	}
 
 	private void handleTestStepStarted(TestStepStarted event) {
