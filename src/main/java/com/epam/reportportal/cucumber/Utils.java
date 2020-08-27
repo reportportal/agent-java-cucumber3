@@ -409,7 +409,7 @@ class Utils {
 		rq.setParameters(Utils.getParameters(arguments, step.getText()));
 		String codeRef = Utils.getCodeRef(testStep);
 		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef).getId());
+		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
 		rq.setAttributes(Utils.getAttributes(testStep));
 		return rq;
 	}
