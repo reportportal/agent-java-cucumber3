@@ -15,18 +15,18 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.service.Launch;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
+import org.apache.commons.lang3.tuple.Pair;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
 import java.util.Calendar;
-
-import static cucumber.api.Result.Type.PASSED;
 
 /**
  * Cucumber reporter for ReportPortal that reports scenarios as test methods.
@@ -50,10 +50,9 @@ import static cucumber.api.Result.Type.PASSED;
  * @author Vitaliy Tsvihun
  */
 public class ScenarioReporter extends AbstractReporter {
-	private static final String SEPARATOR = "-------------------------";
-	private static final String EMPTY_SUFFIX = "";
-	private static final String INFO = "INFO";
-	private static final String STEP_ = "STEP ";
+	private static final String RP_STORY_TYPE = "SUITE";
+	private static final String RP_TEST_TYPE = "STORY";
+	private static final String RP_STEP_TYPE = "STEP";
 
 	protected Supplier<Maybe<String>> rootSuiteId;
 
@@ -65,48 +64,59 @@ public class ScenarioReporter extends AbstractReporter {
 
 	@Override
 	protected void beforeStep(TestStep testStep) {
-		RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
-		Step step = currentScenarioContext.getStep(testStep);
-		int lineInFeaturefile = step.getLocation().getLine();
-		String decoratedStepName = lineInFeaturefile + decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
-				step.getKeyword(),
-				Utils.getStepName(testStep),
-				EMPTY_SUFFIX
-		));
-		String multilineArg = Utils.buildMultilineArgument(testStep);
-		Utils.sendLog(decoratedStepName + multilineArg, INFO, null);
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Step step = context.getStep(testStep);
+		StartTestItemRQ rq = Utils.buildStartStepRequest(context.getStepPrefix(), testStep, step, false);
+		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
 	}
 
 	@Override
 	protected void afterStep(Result result) {
-		if (!result.is(PASSED)) {
-			reportResult(result, decorateMessage(STEP_ + result.getStatus().toString().toUpperCase()));
-		}
+		reportResult(result, null);
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Launch myLaunch = launch.get();
+		Utils.finishTestItem(myLaunch, context.getCurrentStepId(), result.getStatus());
+		context.setCurrentStepId(null);
+		myLaunch.getStepReporter().finishPreviousStep();
 	}
 
 	@Override
 	protected void beforeHooks(HookType hookType) {
-		// noop
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setHasStats(false);
+		Pair<String, String> typeName = Utils.getHookTypeAndName(hookType);
+		rq.setType(typeName.getKey());
+		rq.setName(typeName.getValue());
+		rq.setStartTime(Calendar.getInstance().getTime());
+
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStepId(launch.get().startTestItem(getCurrentScenarioContext().getId(), rq));
+		context.setHookStatus(Result.Type.PASSED);
 	}
 
 	@Override
 	protected void afterHooks(Boolean isBefore) {
-		// noop
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Launch myLaunch = launch.get();
+		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
+		context.setHookStepId(null);
+		myLaunch.getStepReporter().finishPreviousStep();
 	}
 
 	@Override
 	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
-		reportResult(result, (isBefore ? "@Before" : "@After") + "\n" + step.getCodeLocation());
+		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
+		getCurrentScenarioContext().setHookStatus(result.getStatus());
 	}
 
 	@Override
 	protected String getFeatureTestItemType() {
-		return "TEST";
+		return RP_TEST_TYPE;
 	}
 
 	@Override
 	protected String getScenarioTestItemType() {
-		return "STEP";
+		return RP_STEP_TYPE;
 	}
 
 	@Override
@@ -136,18 +146,8 @@ public class ScenarioReporter extends AbstractReporter {
 			StartTestItemRQ rq = new StartTestItemRQ();
 			rq.setName("Root User Story");
 			rq.setStartTime(Calendar.getInstance().getTime());
-			rq.setType("STORY");
+			rq.setType(RP_STORY_TYPE);
 			return launch.get().startTestItem(rq);
 		});
-	}
-
-	/**
-	 * Add separators to log item to distinguish from real log messages
-	 *
-	 * @param message to decorate
-	 * @return decorated message
-	 */
-	private String decorateMessage(String message) {
-		return ScenarioReporter.SEPARATOR + message + ScenarioReporter.SEPARATOR;
 	}
 }

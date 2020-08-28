@@ -25,8 +25,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.endsWith;
-import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.*;
@@ -94,12 +92,8 @@ public class CodeRefTest {
 		StartTestItemRQ feature = items.get(0);
 		StartTestItemRQ scenario = items.get(1);
 
-		assertThat(feature.getCodeRef(),
-				allOf(notNullValue(), equalTo(FEATURE_CODE_REFERENCES))
-		);
-		assertThat(scenario.getCodeRef(),
-				allOf(notNullValue(), equalTo(SCENARIO_CODE_REFERENCES))
-		);
+		assertThat(feature.getCodeRef(), allOf(notNullValue(), equalTo(FEATURE_CODE_REFERENCES)));
+		assertThat(scenario.getCodeRef(), allOf(notNullValue(), equalTo(SCENARIO_CODE_REFERENCES)));
 	}
 
 	private static final List<String> STEP_CODE_REFERENCE = Arrays.asList(
@@ -122,16 +116,15 @@ public class CodeRefTest {
 		StartTestItemRQ scenario = items.get(0);
 		List<StartTestItemRQ> steps = items.subList(1, items.size());
 
-		assertThat(scenario.getCodeRef(),
-				allOf(notNullValue(), equalTo(SCENARIO_CODE_REFERENCES))
-		);
+		assertThat(scenario.getCodeRef(), allOf(notNullValue(), equalTo(SCENARIO_CODE_REFERENCES)));
 
 		IntStream.range(0, STEP_CODE_REFERENCE.size())
 				.forEach(i -> assertThat(steps.get(i).getCodeRef(), allOf(notNullValue(), equalTo(STEP_CODE_REFERENCE.get(i)))));
 	}
 
 	private static final List<String> TWO_FEATURES_CODE_REFERENCES = Arrays.asList("src/test/resources/features/TwoScenarioInOne.feature:3",
-			"src/test/resources/features/TwoScenarioInOne.feature:7");
+			"src/test/resources/features/TwoScenarioInOne.feature:7"
+	);
 
 	private static final List<String> TWO_STEPS_CODE_REFERENCE = Arrays.asList(
 			"com.epam.reportportal.cucumber.integration.feature.EmptySteps.i_have_empty_step",
@@ -152,9 +145,8 @@ public class CodeRefTest {
 		List<StartTestItemRQ> suites = items.subList(0, 2);
 		List<StartTestItemRQ> steps = items.subList(2, items.size());
 
-		IntStream.range(0, TWO_FEATURES_CODE_REFERENCES.size()).forEach(i -> assertThat(suites.get(i).getCodeRef(), allOf(notNullValue(),
-				equalTo(TWO_FEATURES_CODE_REFERENCES.get(i))
-		)));
+		IntStream.range(0, TWO_FEATURES_CODE_REFERENCES.size())
+				.forEach(i -> assertThat(suites.get(i).getCodeRef(), allOf(notNullValue(), equalTo(TWO_FEATURES_CODE_REFERENCES.get(i)))));
 
 		IntStream.range(0, TWO_STEPS_CODE_REFERENCE.size())
 				.forEach(i -> assertThat(steps.get(i).getCodeRef(), allOf(notNullValue(), equalTo(TWO_STEPS_CODE_REFERENCE.get(i)))));

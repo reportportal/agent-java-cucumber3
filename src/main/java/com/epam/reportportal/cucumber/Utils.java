@@ -29,15 +29,15 @@ import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
-import cucumber.api.HookTestStep;
-import cucumber.api.PickleStepTestStep;
-import cucumber.api.Result;
-import cucumber.api.TestStep;
+import cucumber.api.*;
 import cucumber.runtime.StepDefinitionMatch;
+import gherkin.ast.Step;
 import gherkin.ast.Tag;
+import gherkin.pickles.Argument;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Function;
@@ -287,11 +287,8 @@ class Utils {
 
 	@Nullable
 	static String getCodeRef(TestStep testStep) {
-
 		Field definitionMatchField = getDefinitionMatchField(testStep);
-
 		if (definitionMatchField != null) {
-
 			try {
 				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
 				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
@@ -304,11 +301,9 @@ class Utils {
 			} catch (NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
 				return null;
 			}
-
 		} else {
 			return null;
 		}
-
 	}
 
 	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
@@ -399,5 +394,47 @@ class Utils {
 	@Nonnull
 	public static String getCodeRef(@Nonnull String uri, int line) {
 		return uri + ":" + line;
+	}
+
+	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setHasStats(hasStats);
+		rq.setName(Utils.buildNodeName(stepPrefix, step.getKeyword(), Utils.getStepName(testStep), ""));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		List<cucumber.api.Argument> arguments = testStep instanceof PickleStepTestStep ?
+				((PickleStepTestStep) testStep).getDefinitionArgument() :
+				Collections.emptyList();
+		rq.setParameters(Utils.getParameters(arguments, step.getText()));
+		String codeRef = Utils.getCodeRef(testStep);
+		rq.setCodeRef(codeRef);
+		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
+		rq.setAttributes(Utils.getAttributes(testStep));
+		return rq;
+	}
+
+	public static Pair<String, String> getHookTypeAndName(HookType hookType) {
+		String name = null;
+		String type = null;
+		switch (hookType) {
+			case Before:
+				name = "Before hooks";
+				type = "BEFORE_TEST";
+				break;
+			case After:
+				name = "After hooks";
+				type = "AFTER_TEST";
+				break;
+			case AfterStep:
+				name = "After step";
+				type = "AFTER_METHOD";
+				break;
+			case BeforeStep:
+				name = "Before step";
+				type = "BEFORE_METHOD";
+				break;
+		}
+		return Pair.of(type, name);
 	}
 }
