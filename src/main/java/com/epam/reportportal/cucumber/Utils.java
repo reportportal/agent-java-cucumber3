@@ -138,7 +138,7 @@ class Utils {
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
 		if ("STEP".equals(type)) {
-			rq.setTestCaseId(TestCaseIdUtils.getTestCaseId(codeRef, null).getId());
+			rq.setTestCaseId(ofNullable(Utils.getTestCaseId(codeRef, null)).map(TestCaseIdEntry::getId).orElse(null));
 		}
 
 		return rp.startTestItem(rootItemId, rq);
