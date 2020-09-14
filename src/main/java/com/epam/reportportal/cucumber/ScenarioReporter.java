@@ -69,7 +69,7 @@ public class ScenarioReporter extends AbstractReporter {
 
 	@Override
 	protected StartTestItemRQ buildStartHookRequest(HookType hookType) {
-		StartTestItemRQ rq = buildStartHookRequest(hookType);
+		StartTestItemRQ rq = super.buildStartHookRequest(hookType);
 		rq.setHasStats(false);
 		return rq;
 	}

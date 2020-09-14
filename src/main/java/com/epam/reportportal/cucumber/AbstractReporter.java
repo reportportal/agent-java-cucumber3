@@ -1,17 +1,17 @@
 /*
- *  Copyright 2020 EPAM Systems
+ * Copyright 2020 EPAM Systems
  *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.epam.reportportal.cucumber;
 
@@ -20,6 +20,7 @@ import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
+import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
@@ -49,8 +50,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static com.epam.reportportal.cucumber.Utils.getCodeRef;
 import static com.epam.reportportal.cucumber.Utils.getDescription;
+import static com.epam.reportportal.cucumber.util.ItemTreeUtils.createKey;
+import static com.epam.reportportal.cucumber.util.ItemTreeUtils.retrieveLeaf;
 import static java.util.Optional.ofNullable;
 import static rp.com.google.common.base.Strings.isNullOrEmpty;
+import static rp.com.google.common.base.Throwables.getStackTraceAsString;
 
 /**
  * Abstract Cucumber 3.x formatter for Report Portal
@@ -63,13 +67,15 @@ import static rp.com.google.common.base.Strings.isNullOrEmpty;
 public abstract class AbstractReporter implements Formatter {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
-
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
+	private static final int DEFAULT_CAPACITY = 16;
 
-	protected static final String COLON_INFIX = ": ";
+	public static final TestItemTree ITEM_TREE = new TestItemTree();
+	private static volatile ReportPortal REPORT_PORTAL = ReportPortal.builder().build();
 
-	protected static final String SKIPPED_ISSUE_KEY = "skippedIssue";
 	protected Supplier<Launch> launch;
+	protected static final String COLON_INFIX = ": ";
+	protected static final String SKIPPED_ISSUE_KEY = "skippedIssue";
 
 	private final Map<String, RunningContext.FeatureContext> currentFeatureContextMap = new ConcurrentHashMap<>();
 
@@ -81,6 +87,14 @@ public abstract class AbstractReporter implements Formatter {
 	// This map is used to record the last scenario time and its feature uri.
 	// End of feature occurs once launch is finished.
 	private final Map<String, Date> featureEndTime = new ConcurrentHashMap<>();
+
+	public static ReportPortal getReportPortal() {
+		return REPORT_PORTAL;
+	}
+
+	protected static void setReportPortal(ReportPortal reportPortal) {
+		REPORT_PORTAL = reportPortal;
+	}
 
 	/**
 	 * Registers an event handler for a specific event.
@@ -111,12 +125,17 @@ public abstract class AbstractReporter implements Formatter {
 		publisher.registerHandlerFor(WriteEvent.class, getWriteEventHandler());
 	}
 
+	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
+		return currentScenarioContext.get();
+	}
+
 	/**
 	 * Manipulations before the launch starts
 	 */
 	protected void beforeLaunch() {
 		startLaunch();
-		launch.get().start();
+		Maybe<String> launchId = launch.get().start();
+		ITEM_TREE.setLaunchId(launchId);
 	}
 
 	/**
@@ -137,22 +156,37 @@ public abstract class AbstractReporter implements Formatter {
 		launch.get().finish(finishLaunchRq);
 	}
 
+	private void addToTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
+		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
+				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId(), DEFAULT_CAPACITY)));
+	}
+
 	/**
 	 * Start Cucumber scenario
 	 */
-	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext context,
+	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext,
 			String scenarioName) {
-		String description = getDescription(currentFeatureContext.getUri());
-		String codeRef = getCodeRef(currentFeatureContext.getUri(), context.getLine());
-		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
-				currentFeatureContext.getFeatureId(),
+		String description = getDescription(featureContext.getUri());
+		String codeRef = getCodeRef(featureContext.getUri(), scenarioContext.getLine());
+		Launch myLaunch = launch.get();
+		Maybe<String> id = Utils.startNonLeafNode(
+				myLaunch,
+				featureContext.getFeatureId(),
 				scenarioName,
 				description,
 				codeRef,
-				context.getAttributes(),
+				scenarioContext.getAttributes(),
 				getScenarioTestItemType()
 		);
-		context.setId(id);
+		scenarioContext.setId(id);
+		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
+			addToTree(featureContext, scenarioContext);
+		}
+	}
+
+	private void removeFromTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
+		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
+				.remove(createKey(scenarioContext.getLine())));
 	}
 
 	/**
@@ -161,16 +195,12 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected void afterScenario(TestCaseFinished event) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		for (Map.Entry<Pair<Integer, String>, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
-			if (scenarioContext.getValue().getLine() == context.getLine()) {
-				currentScenarioContextMap.remove(scenarioContext.getKey());
-				Date endTime = Utils.finishTestItem(launch.get(), context.getId(), event.result.getStatus());
-				String featureURI = scenarioContext.getKey().getValue();
-				featureEndTime.put(featureURI, endTime);
-				break;
-			}
-		}
+		String featureUri = context.getFeatureUri();
+		currentScenarioContextMap.remove(Pair.of(context.getLine(), featureUri));
+		Date endTime = Utils.finishTestItem(launch.get(), context.getId(), event.result.getStatus());
+		featureEndTime.put(featureUri, endTime);
 		currentScenarioContext.set(null);
+		removeFromTree(currentFeatureContextMap.get(context.getFeatureUri()), context);
 	}
 
 	/**
@@ -194,13 +224,12 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setAttributes(parameters.getAttributes());
 				rq.getAttributes()
 						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
+				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (!isNullOrEmpty(parameters.getRerunOf())) {
 					rq.setRerunOf(parameters.getRerunOf());
 				}
-				if (!isNullOrEmpty(parameters.getDescription())) {
-					rq.setDescription(parameters.getDescription());
-				}
+
 				if (null != parameters.getSkippedAnIssue()) {
 					ItemAttributesRQ skippedIssueAttribute = new ItemAttributesRQ();
 					skippedIssueAttribute.setKey(SKIPPED_ISSUE_KEY);
@@ -208,6 +237,7 @@ public abstract class AbstractReporter implements Formatter {
 					skippedIssueAttribute.setSystem(true);
 					rq.getAttributes().add(skippedIssueAttribute);
 				}
+
 				return reportPortal.newLaunch(rq);
 			}
 		});
@@ -246,7 +276,15 @@ public abstract class AbstractReporter implements Formatter {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		Step step = context.getStep(testStep);
 		StartTestItemRQ rq = buildStartStepRequest(testStep, context.getStepPrefix(), step.getKeyword());
-		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
+		Launch myLaunch = launch.get();
+		Maybe<String> stepId = myLaunch.startTestItem(context.getId(), rq);
+		context.setCurrentStepId(stepId);
+		String stepText = step.getText();
+		context.setCurrentText(stepText);
+
+		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
+			addToTree(context, step.getText(), stepId);
+		}
 	}
 
 	/**
@@ -280,6 +318,8 @@ public abstract class AbstractReporter implements Formatter {
 
 	/**
 	 * Called when before/after-hooks are started
+	 *
+	 * @param hookType a hook type
 	 */
 	protected void beforeHooks(HookType hookType) {
 		StartTestItemRQ rq = buildStartHookRequest(hookType);
@@ -300,6 +340,10 @@ public abstract class AbstractReporter implements Formatter {
 		myLaunch.getStepReporter().finishPreviousStep();
 		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
 		context.setHookStepId(null);
+		if (hookType == HookType.AfterStep) {
+			removeFromTree(context, context.getCurrentText());
+			context.setCurrentText(null);
+		}
 	}
 
 	/**
@@ -309,13 +353,13 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param result   Hook result
 	 * @param isBefore - if true, before-hook, if false - after-hook
 	 */
-	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
+	protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
 		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
 		getCurrentScenarioContext().setHookStatus(result.getStatus());
 	}
 
 	/**
-	 * Return RP test item name mapped to Cucumber feature
+	 * Return RP launch test item name mapped to Cucumber feature
 	 *
 	 * @return test item name
 	 */
@@ -323,7 +367,7 @@ public abstract class AbstractReporter implements Formatter {
 	protected abstract String getFeatureTestItemType();
 
 	/**
-	 * Return RP test item name mapped to Cucumber scenario
+	 * Return RP launch test item name mapped to Cucumber scenario
 	 *
 	 * @return test item name
 	 */
@@ -339,12 +383,15 @@ public abstract class AbstractReporter implements Formatter {
 	protected void reportResult(Result result, String message) {
 		String cukesStatus = result.getStatus().toString();
 		String level = Utils.mapLevel(cukesStatus);
+		if (message != null) {
+			Utils.sendLog(message, level);
+		}
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
 			Utils.sendLog(errorMessage, level);
 		}
-		if (message != null) {
-			Utils.sendLog(message, level);
+		if (result.getError() != null) {
+			Utils.sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
 
@@ -375,7 +422,6 @@ public abstract class AbstractReporter implements Formatter {
 		}
 		String prefix = "";
 		try {
-
 			MediaType mt = getMimeTypes().forName(type).getType();
 			prefix = mt.getType();
 		} catch (MimeTypeException e) {
@@ -388,15 +434,12 @@ public abstract class AbstractReporter implements Formatter {
 		Utils.sendLog(text, "INFO");
 	}
 
-	protected boolean isBefore(TestStep step) {
+	private boolean isBefore(TestStep step) {
 		return HookType.Before == ((HookTestStep) step).getHookType();
 	}
 
+	@Nonnull
 	protected abstract Optional<Maybe<String>> getRootItemId();
-
-	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
-		return currentScenarioContext.get();
-	}
 
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
 		String featureKeyword = context.getFeature().getKeyword();
@@ -417,85 +460,97 @@ public abstract class AbstractReporter implements Formatter {
 	 * Private part that responsible for handling events
 	 */
 
-	private EventHandler<TestRunStarted> getTestRunStartedHandler() {
+	protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
 		return event -> beforeLaunch();
 	}
 
-	private EventHandler<TestSourceRead> getTestSourceReadHandler() {
+	protected EventHandler<TestSourceRead> getTestSourceReadHandler() {
 		return event -> RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
 	}
 
-	private EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
+	protected EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
 		return this::handleStartOfTestCase;
 	}
 
-	private EventHandler<TestStepStarted> getTestStepStartedHandler() {
+	protected EventHandler<TestStepStarted> getTestStepStartedHandler() {
 		return this::handleTestStepStarted;
 	}
 
-	private EventHandler<TestStepFinished> getTestStepFinishedHandler() {
+	protected EventHandler<TestStepFinished> getTestStepFinishedHandler() {
 		return this::handleTestStepFinished;
 	}
 
-	private EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
+	protected EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
 		return this::afterScenario;
 	}
 
-	private EventHandler<TestRunFinished> getTestRunFinishedHandler() {
+	protected EventHandler<TestRunFinished> getTestRunFinishedHandler() {
 		return event -> {
 			handleEndOfFeature();
 			afterLaunch();
 		};
 	}
 
-	private EventHandler<EmbedEvent> getEmbedEventHandler() {
+	protected EventHandler<EmbedEvent> getEmbedEventHandler() {
 		return event -> embedding(event.mimeType, event.data);
 	}
 
-	private EventHandler<WriteEvent> getWriteEventHandler() {
+	protected EventHandler<WriteEvent> getWriteEventHandler() {
 		return event -> write(event.text);
 	}
 
-	private void handleEndOfFeature() {
-		for (RunningContext.FeatureContext value : currentFeatureContextMap.values()) {
-			Date featureCompletionDateTime = featureEndTime.get(value.getUri());
-			Utils.finishFeature(launch.get(), value.getFeatureId(), featureCompletionDateTime);
-		}
+	private void removeFromTree(RunningContext.FeatureContext featureContext) {
+		ITEM_TREE.getTestItems().remove(createKey(featureContext.getUri()));
+	}
+
+	protected void handleEndOfFeature() {
+		currentFeatureContextMap.values().forEach(f -> {
+			Date featureCompletionDateTime = featureEndTime.get(f.getUri());
+			Utils.finishFeature(launch.get(), f.getFeatureId(), featureCompletionDateTime);
+			removeFromTree(f);
+		});
 		currentFeatureContextMap.clear();
 	}
 
-	private void handleStartOfTestCase(TestCaseStarted event) {
+	private void addToTree(RunningContext.FeatureContext context) {
+		ITEM_TREE.getTestItems()
+				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId(), DEFAULT_CAPACITY));
+	}
+
+	protected void handleStartOfTestCase(TestCaseStarted event) {
 		TestCase testCase = event.testCase;
 		RunningContext.FeatureContext newFeatureContext = new RunningContext.FeatureContext(testCase);
 		String featureUri = newFeatureContext.getUri();
-		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(featureUri,
-				u -> startFeatureContext(newFeatureContext)
-		);
+		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(featureUri, u -> {
+			RunningContext.FeatureContext c = startFeatureContext(newFeatureContext);
+			if (launch.get().getParameters().isCallbackReportingEnabled()) {
+				addToTree(c);
+			}
+			return c;
+		});
 
 		if (!featureContext.getUri().equals(testCase.getUri())) {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
 		}
 
 		RunningContext.ScenarioContext newScenarioContext = featureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(newScenarioContext.getKeyword(),
+		String scenarioName = Utils.buildNodeName(
+				newScenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				newScenarioContext.getName(),
 				newScenarioContext.getOutlineIteration()
 		);
 
-		Pair<Integer, String> scenarioNameFeatureURI = Pair.of(testCase.getLine(), featureContext.getUri());
-		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
-
-		if (scenarioContext == null) {
-			scenarioContext = newScenarioContext;
-			currentScenarioContextMap.put(scenarioNameFeatureURI, scenarioContext);
-			currentScenarioContext.set(scenarioContext);
-		}
+		Pair<Integer, String> scenarioLineFeatureURI = Pair.of(newScenarioContext.getLine(), featureContext.getUri());
+		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.computeIfAbsent(scenarioLineFeatureURI, k -> {
+			currentScenarioContext.set(newScenarioContext);
+			return newScenarioContext;
+		});
 
 		beforeScenario(featureContext, scenarioContext, scenarioName);
 	}
 
-	private void handleTestStepStarted(TestStepStarted event) {
+	protected void handleTestStepStarted(TestStepStarted event) {
 		TestStep testStep = event.testStep;
 		if (testStep instanceof HookTestStep) {
 			beforeHooks(((HookTestStep) testStep).getHookType());
@@ -507,14 +562,29 @@ public abstract class AbstractReporter implements Formatter {
 		}
 	}
 
-	private void handleTestStepFinished(TestStepFinished event) {
+	protected void handleTestStepFinished(TestStepFinished event) {
 		if (event.testStep instanceof HookTestStep) {
 			HookTestStep testStep = (HookTestStep) event.testStep;
-			hookFinished(event.testStep, event.result, isBefore(event.testStep));
+			hookFinished(testStep, event.result, isBefore(event.testStep));
 			afterHooks(testStep.getHookType());
 		} else {
 			afterStep(event.result);
 		}
 	}
 
+	protected void addToTree(RunningContext.ScenarioContext scenarioContext, String text, Maybe<String> stepId) {
+		retrieveLeaf(
+				scenarioContext.getFeatureUri(),
+				scenarioContext.getLine(),
+				ITEM_TREE
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
+	}
+
+	protected void removeFromTree(RunningContext.ScenarioContext scenarioContext, String text) {
+		retrieveLeaf(
+				scenarioContext.getFeatureUri(),
+				scenarioContext.getLine(),
+				ITEM_TREE
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().remove(createKey(text)));
+	}
 }
