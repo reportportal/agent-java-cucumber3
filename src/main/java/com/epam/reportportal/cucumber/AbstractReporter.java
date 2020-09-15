@@ -169,8 +169,7 @@ public abstract class AbstractReporter implements Formatter {
 		String description = getDescription(featureContext.getUri());
 		String codeRef = getCodeRef(featureContext.getUri(), scenarioContext.getLine());
 		Launch myLaunch = launch.get();
-		Maybe<String> id = Utils.startNonLeafNode(
-				myLaunch,
+		Maybe<String> id = Utils.startNonLeafNode(myLaunch,
 				featureContext.getFeatureId(),
 				scenarioName,
 				description,
@@ -251,7 +250,7 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
 		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setName(Utils.buildNodeName(stepPrefix, keyword, Utils.getStepName(testStep), ""));
+		rq.setName(Utils.buildName(stepPrefix, keyword, Utils.getStepName(testStep)));
 		rq.setDescription(Utils.buildMultilineArgument(testStep));
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType("STEP");
@@ -447,7 +446,7 @@ public abstract class AbstractReporter implements Formatter {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setDescription(getDescription(context.getUri()));
 		rq.setCodeRef(getCodeRef(context.getUri(), 0));
-		rq.setName(Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
+		rq.setName(Utils.buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
 		rq.setAttributes(context.getAttributes());
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(getFeatureTestItemType());
@@ -534,12 +533,7 @@ public abstract class AbstractReporter implements Formatter {
 		}
 
 		RunningContext.ScenarioContext newScenarioContext = featureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(
-				newScenarioContext.getKeyword(),
-				AbstractReporter.COLON_INFIX,
-				newScenarioContext.getName(),
-				newScenarioContext.getOutlineIteration()
-		);
+		String scenarioName = Utils.buildName(newScenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, newScenarioContext.getName());
 
 		Pair<Integer, String> scenarioLineFeatureURI = Pair.of(newScenarioContext.getLine(), featureContext.getUri());
 		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.computeIfAbsent(scenarioLineFeatureURI, k -> {
@@ -573,16 +567,14 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	protected void addToTree(RunningContext.ScenarioContext scenarioContext, String text, Maybe<String> stepId) {
-		retrieveLeaf(
-				scenarioContext.getFeatureUri(),
+		retrieveLeaf(scenarioContext.getFeatureUri(),
 				scenarioContext.getLine(),
 				ITEM_TREE
 		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
 	}
 
 	protected void removeFromTree(RunningContext.ScenarioContext scenarioContext, String text) {
-		retrieveLeaf(
-				scenarioContext.getFeatureUri(),
+		retrieveLeaf(scenarioContext.getFeatureUri(),
 				scenarioContext.getLine(),
 				ITEM_TREE
 		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().remove(createKey(text)));
