@@ -209,7 +209,7 @@ public abstract class AbstractReporter implements Formatter {
 	protected void startLaunch() {
 		launch = Suppliers.memoize(new Supplier<Launch>() {
 
-			/* should no be lazy */
+			/* should not be lazy */
 			private final Date startTime = Calendar.getInstance().getTime();
 
 			@Override
@@ -283,7 +283,7 @@ public abstract class AbstractReporter implements Formatter {
 		context.setCurrentText(stepText);
 
 		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
-			addToTree(context, step.getText(), stepId);
+			addToTree(context, stepText, stepId);
 		}
 	}
 
@@ -325,7 +325,7 @@ public abstract class AbstractReporter implements Formatter {
 		StartTestItemRQ rq = buildStartHookRequest(hookType);
 
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		context.setHookStepId(launch.get().startTestItem(getCurrentScenarioContext().getId(), rq));
+		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
 		context.setHookStatus(Result.Type.PASSED);
 	}
 
