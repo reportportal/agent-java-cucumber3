@@ -797,7 +797,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param tags - Cucumber tags
 	 * @return set of tags
 	 */
-	protected Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
+	@Nonnull
+	protected Set<ItemAttributesRQ> extractPickleTags(@Nonnull List<PickleTag> tags) {
 		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (PickleTag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
@@ -811,7 +812,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param tags - Cucumber tags
 	 * @return set of attributes
 	 */
-	protected Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
+	@Nonnull
+	protected Set<ItemAttributesRQ> extractAttributes(@Nonnull List<Tag> tags) {
 		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
