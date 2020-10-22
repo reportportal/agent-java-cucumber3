@@ -236,6 +236,8 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Finish Cucumber scenario
 	 * Put scenario end time in a map to check last scenario end time per feature
+	 *
+	 * @param event Cucumber's TestCaseFinished object
 	 */
 	protected void afterScenario(TestCaseFinished event) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
@@ -290,7 +292,9 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Extension point to customize test creation event/request
 	 *
-	 * @param testStep a cucumber step object
+	 * @param testStep   a cucumber step object
+	 * @param stepPrefix a prefix of the step (e.g. 'Background')
+	 * @param keyword    a step keyword (e.g. 'Given')
 	 * @return Request to ReportPortal
 	 */
 	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
@@ -518,10 +522,6 @@ public abstract class AbstractReporter implements Formatter {
 		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
-
-	/**
-	 * Private part that responsible for handling events
-	 */
 
 	protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
 		return event -> beforeLaunch();
