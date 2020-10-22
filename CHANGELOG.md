@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Added
 - Missed javadocs
+- A protected method `buildStartFeatureRequest` to ease Feature creation customization
 
 ## [5.0.0]
 ### Added
