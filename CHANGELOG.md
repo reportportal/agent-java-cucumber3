@@ -5,6 +5,8 @@
 - Missed javadocs
 - Missed annotations
 - A protected method `buildStartFeatureRequest` to ease Feature creation customization
+### Changed
+- Client version updated on [5.0.15](https://github.com/reportportal/client-java/releases/tag/5.0.15)
 
 ## [5.0.0]
 ### Added
