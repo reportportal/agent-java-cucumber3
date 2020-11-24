@@ -87,7 +87,6 @@ public abstract class AbstractReporter implements Formatter {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
-	private static final int DEFAULT_CAPACITY = 16;
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
@@ -182,7 +181,7 @@ public abstract class AbstractReporter implements Formatter {
 
 	private void addToTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
 		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
-				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId(), DEFAULT_CAPACITY)));
+				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId())));
 	}
 
 	/**
@@ -236,6 +235,8 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Finish Cucumber scenario
 	 * Put scenario end time in a map to check last scenario end time per feature
+	 *
+	 * @param event Cucumber's TestCaseFinished object
 	 */
 	protected void afterScenario(TestCaseFinished event) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
@@ -290,7 +291,9 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Extension point to customize test creation event/request
 	 *
-	 * @param testStep a cucumber step object
+	 * @param testStep   a cucumber step object
+	 * @param stepPrefix a prefix of the step (e.g. 'Background')
+	 * @param keyword    a step keyword (e.g. 'Given')
 	 * @return Request to ReportPortal
 	 */
 	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
@@ -426,8 +429,7 @@ public abstract class AbstractReporter implements Formatter {
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
-		}
-		if (result.getError() != null) {
+		} else if (result.getError() != null) {
 			sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
@@ -504,24 +506,32 @@ public abstract class AbstractReporter implements Formatter {
 	@Nonnull
 	protected abstract Optional<Maybe<String>> getRootItemId();
 
+	/**
+	 * Extension point to customize feature creation event/request
+	 *
+	 * @param feature a Cucumber's Feature object
+	 * @param uri     a path to the feature
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartFeatureRequest(Feature feature, String uri) {
+		String featureKeyword = feature.getKeyword();
+		String featureName = feature.getName();
+		StartTestItemRQ startFeatureRq = new StartTestItemRQ();
+		startFeatureRq.setDescription(getDescription(feature, uri));
+		startFeatureRq.setCodeRef(getCodeRef(uri, 0));
+		startFeatureRq.setName(buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
+		startFeatureRq.setAttributes(extractAttributes(feature.getTags()));
+		startFeatureRq.setStartTime(Calendar.getInstance().getTime());
+		startFeatureRq.setType(getFeatureTestItemType());
+		return startFeatureRq;
+	}
+
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
-		String featureKeyword = context.getFeature().getKeyword();
-		String featureName = context.getFeature().getName();
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setDescription(getDescription(context.getFeature(), context.getUri()));
-		rq.setCodeRef(getCodeRef(context.getUri(), 0));
-		rq.setName(Utils.buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
-		rq.setAttributes(extractAttributes(context.getFeature().getTags()));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType(getFeatureTestItemType());
 		Optional<Maybe<String>> root = getRootItemId();
+		StartTestItemRQ rq = buildStartFeatureRequest(context.getFeature(), context.getUri());
 		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
-
-	/**
-	 * Private part that responsible for handling events
-	 */
 
 	protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
 		return event -> beforeLaunch();
@@ -577,7 +587,7 @@ public abstract class AbstractReporter implements Formatter {
 
 	private void addToTree(RunningContext.FeatureContext context) {
 		ITEM_TREE.getTestItems()
-				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId(), DEFAULT_CAPACITY));
+				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
 	}
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
@@ -633,7 +643,7 @@ public abstract class AbstractReporter implements Formatter {
 		retrieveLeaf(scenarioContext.getFeatureUri(),
 				scenarioContext.getLine(),
 				ITEM_TREE
-		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId)));
 	}
 
 	protected void removeFromTree(RunningContext.ScenarioContext scenarioContext, String text) {
@@ -712,7 +722,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param status - Cucumber status
 	 * @return RP test item status and null if status is null
 	 */
-	protected String mapItemStatus(Result.Type status) {
+	@Nullable
+	protected String mapItemStatus(@Nullable Result.Type status) {
 		if (status == null) {
 			return null;
 		} else {
@@ -785,7 +796,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param tags - Cucumber tags
 	 * @return set of tags
 	 */
-	protected Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
+	@Nonnull
+	protected Set<ItemAttributesRQ> extractPickleTags(@Nonnull List<PickleTag> tags) {
 		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (PickleTag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
@@ -799,7 +811,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param tags - Cucumber tags
 	 * @return set of attributes
 	 */
-	protected Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
+	@Nonnull
+	protected Set<ItemAttributesRQ> extractAttributes(@Nonnull List<Tag> tags) {
 		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));

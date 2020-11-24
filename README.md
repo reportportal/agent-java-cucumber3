@@ -30,7 +30,7 @@ Add to POM.xml
 <dependency>
   <groupId>com.epam.reportportal</groupId>
   <artifactId>agent-java-cucumber3</artifactId>
-  <version>0.0.1-beta</version>
+  <version>5.0.1</version>
   <type>pom</type>
 </dependency>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

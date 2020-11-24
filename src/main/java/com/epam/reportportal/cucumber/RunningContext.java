@@ -167,6 +167,8 @@ public class RunningContext {
 
 		/**
 		 * Takes the serial number of scenario outline and links it to the executing scenario
+		 *
+		 * @param scenarioOutline Cucumber's ScenarioDefinition object
 		 **/
 		public void processScenarioOutline(ScenarioDefinition scenarioOutline) {
 			if (isScenarioOutline(scenarioOutline)) {
