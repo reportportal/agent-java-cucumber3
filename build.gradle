@@ -53,8 +53,7 @@ dependencies {
 
     api 'io.cucumber:cucumber-java:3.0.2'
 
-    testImplementation('com.github.reportportal:agent-java-test-utils:ddcf50ee20')
-
+    testImplementation 'com.github.reportportal:agent-java-test-utils:ddcf50ee20'
     testImplementation 'org.aspectj:aspectjweaver:1.9.2'
     testImplementation 'org.hamcrest:hamcrest-core:2.2'
     testImplementation 'org.mockito:mockito-core:3.3.3'

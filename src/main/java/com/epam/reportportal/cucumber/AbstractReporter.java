@@ -429,8 +429,7 @@ public abstract class AbstractReporter implements Formatter {
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
-		}
-		if (result.getError() != null) {
+		} else if (result.getError() != null) {
 			sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
