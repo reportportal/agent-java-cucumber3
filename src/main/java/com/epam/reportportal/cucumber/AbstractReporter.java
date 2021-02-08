@@ -25,6 +25,7 @@ import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.AttributeParser;
+import com.epam.reportportal.utils.MemoizingSupplier;
 import com.epam.reportportal.utils.ParameterUtils;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
@@ -51,8 +52,6 @@ import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rp.com.google.common.base.Supplier;
-import rp.com.google.common.base.Suppliers;
 import rp.com.google.common.io.ByteSource;
 
 import javax.annotation.Nonnull;
@@ -64,6 +63,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -72,8 +72,8 @@ import static com.epam.reportportal.cucumber.Utils.LOG_LEVEL_MAPPING;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.createKey;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.retrieveLeaf;
 import static java.util.Optional.ofNullable;
-import static rp.com.google.common.base.Strings.isNullOrEmpty;
-import static rp.com.google.common.base.Throwables.getStackTraceAsString;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
 /**
  * Abstract Cucumber 3.x formatter for Report Portal
@@ -252,7 +252,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * Start RP launch
 	 */
 	protected void startLaunch() {
-		launch = Suppliers.memoize(new Supplier<Launch>() {
+		launch = new MemoizingSupplier<>(new Supplier<Launch>() {
 
 			/* should not be lazy */
 			private final Date startTime = Calendar.getInstance().getTime();
@@ -271,7 +271,7 @@ public abstract class AbstractReporter implements Formatter {
 						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
-				if (!isNullOrEmpty(parameters.getRerunOf())) {
+				if (isNotBlank(parameters.getRerunOf())) {
 					rq.setRerunOf(parameters.getRerunOf());
 				}
 
@@ -430,7 +430,7 @@ public abstract class AbstractReporter implements Formatter {
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
 		} else if (result.getError() != null) {
-			sendLog(getStackTraceAsString(result.getError()), level);
+			sendLog(getStackTrace(result.getError()), level);
 		}
 	}
 
