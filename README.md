@@ -1,5 +1,10 @@
 # Cucumber3 Agent for ReportPortal
- [ ![Download](https://api.bintray.com/packages/epam/reportportal/agent-java-cucumber3/images/download.svg) ](https://bintray.com/epam/reportportal/agent-java-cucumber3/_latestVersion)
+
+> **DISCLAIMER**: We use Google Analytics for sending anonymous usage information such as agent's and client's names, and their versions
+> after a successful launch start. This information might help us to improve both ReportPortal backend and client sides. It is used by the
+> ReportPortal team only and is not supposed for sharing with 3rd parties.
+
+[ ![Download](https://api.bintray.com/packages/epam/reportportal/agent-java-cucumber3/images/download.svg) ](https://bintray.com/epam/reportportal/agent-java-cucumber3/_latestVersion)
  
 ![CI Build](https://github.com/reportportal/agent-java-cucumber3/workflows/CI%20Build/badge.svg)
 [![Join Slack chat!](https://reportportal-slack-auto.herokuapp.com/badge.svg)](https://reportportal-slack-auto.herokuapp.com)
