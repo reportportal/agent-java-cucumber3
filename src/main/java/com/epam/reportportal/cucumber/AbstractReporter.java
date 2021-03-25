@@ -266,9 +266,9 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setName(parameters.getLaunchName());
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
-				rq.setAttributes(parameters.getAttributes());
-				rq.getAttributes()
-						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
+				Set<ItemAttributesRQ> attributes = new HashSet<>(parameters.getAttributes());
+				rq.setAttributes(attributes);
+				attributes.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (isNotBlank(parameters.getRerunOf())) {
@@ -280,7 +280,7 @@ public abstract class AbstractReporter implements Formatter {
 					skippedIssueAttribute.setKey(SKIPPED_ISSUE_KEY);
 					skippedIssueAttribute.setValue(parameters.getSkippedAnIssue().toString());
 					skippedIssueAttribute.setSystem(true);
-					rq.getAttributes().add(skippedIssueAttribute);
+					attributes.add(skippedIssueAttribute);
 				}
 
 				return reportPortal.newLaunch(rq);
