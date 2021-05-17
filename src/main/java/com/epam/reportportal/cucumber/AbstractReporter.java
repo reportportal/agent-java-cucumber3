@@ -25,6 +25,7 @@ import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.AttributeParser;
+import com.epam.reportportal.utils.MemoizingSupplier;
 import com.epam.reportportal.utils.ParameterUtils;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
@@ -35,14 +36,16 @@ import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import cucumber.api.*;
-import cucumber.api.Argument;
 import cucumber.api.event.*;
 import cucumber.api.formatter.Formatter;
 import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Feature;
 import gherkin.ast.Step;
 import gherkin.ast.Tag;
-import gherkin.pickles.*;
+import gherkin.pickles.PickleCell;
+import gherkin.pickles.PickleString;
+import gherkin.pickles.PickleTable;
+import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tika.Tika;
@@ -51,8 +54,6 @@ import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rp.com.google.common.base.Supplier;
-import rp.com.google.common.base.Suppliers;
 import rp.com.google.common.io.ByteSource;
 
 import javax.annotation.Nonnull;
@@ -64,16 +65,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.epam.reportportal.cucumber.Utils.*;
-import static com.epam.reportportal.cucumber.Utils.LOG_LEVEL_MAPPING;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.createKey;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.retrieveLeaf;
 import static java.util.Optional.ofNullable;
-import static rp.com.google.common.base.Strings.isNullOrEmpty;
-import static rp.com.google.common.base.Throwables.getStackTraceAsString;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
 /**
  * Abstract Cucumber 3.x formatter for Report Portal
@@ -252,7 +253,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * Start RP launch
 	 */
 	protected void startLaunch() {
-		launch = Suppliers.memoize(new Supplier<Launch>() {
+		launch = new MemoizingSupplier<>(new Supplier<Launch>() {
 
 			/* should not be lazy */
 			private final Date startTime = Calendar.getInstance().getTime();
@@ -266,12 +267,12 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setName(parameters.getLaunchName());
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
-				rq.setAttributes(parameters.getAttributes());
-				rq.getAttributes()
-						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
+				Set<ItemAttributesRQ> attributes = new HashSet<>(parameters.getAttributes());
+				rq.setAttributes(attributes);
+				attributes.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
-				if (!isNullOrEmpty(parameters.getRerunOf())) {
+				if (isNotBlank(parameters.getRerunOf())) {
 					rq.setRerunOf(parameters.getRerunOf());
 				}
 
@@ -280,7 +281,7 @@ public abstract class AbstractReporter implements Formatter {
 					skippedIssueAttribute.setKey(SKIPPED_ISSUE_KEY);
 					skippedIssueAttribute.setValue(parameters.getSkippedAnIssue().toString());
 					skippedIssueAttribute.setSystem(true);
-					rq.getAttributes().add(skippedIssueAttribute);
+					attributes.add(skippedIssueAttribute);
 				}
 
 				return reportPortal.newLaunch(rq);
@@ -430,7 +431,7 @@ public abstract class AbstractReporter implements Formatter {
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
 		} else if (result.getError() != null) {
-			sendLog(getStackTraceAsString(result.getError()), level);
+			sendLog(getStackTrace(result.getError()), level);
 		}
 	}
 
@@ -586,8 +587,7 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	private void addToTree(RunningContext.FeatureContext context) {
-		ITEM_TREE.getTestItems()
-				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
+		ITEM_TREE.getTestItems().put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
 	}
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
@@ -761,31 +761,28 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	@Nonnull
 	protected String buildMultilineArgument(@Nonnull TestStep step) {
-		List<PickleRow> table = null;
-		String dockString = "";
-		StringBuilder marg = new StringBuilder();
+		List<List<String>> table = null;
+		String docString = null;
 		PickleStepTestStep pickleStep = (PickleStepTestStep) step;
 		if (!pickleStep.getStepArgument().isEmpty()) {
 			gherkin.pickles.Argument argument = pickleStep.getStepArgument().get(0);
 			if (argument instanceof PickleString) {
-				dockString = ((PickleString) argument).getContent();
+				docString = ((PickleString) argument).getContent();
 			} else if (argument instanceof PickleTable) {
-				table = ((PickleTable) argument).getRows();
-			}
-		}
-		if (table != null) {
-			marg.append("\r\n");
-			for (PickleRow row : table) {
-				marg.append(TABLE_SEPARATOR);
-				for (PickleCell cell : row.getCells()) {
-					marg.append(" ").append(cell.getValue()).append(" ").append(TABLE_SEPARATOR);
-				}
-				marg.append("\r\n");
+				table = ((PickleTable) argument).getRows()
+						.stream()
+						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
+						.collect(Collectors.toList());
 			}
 		}
 
-		if (!dockString.isEmpty()) {
-			marg.append(DOCSTRING_DECORATOR).append(dockString).append(DOCSTRING_DECORATOR);
+		StringBuilder marg = new StringBuilder();
+		if (table != null) {
+			marg.append(formatDataTable(table));
+		}
+
+		if (docString != null) {
+			marg.append(DOCSTRING_DECORATOR).append(docString).append(DOCSTRING_DECORATOR);
 		}
 		return marg.toString();
 	}
@@ -885,8 +882,8 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Return a Test Case ID for mapped code
 	 *
-	 * @param testStep   Cucumber's TestStep object
-	 * @param codeRef a code reference
+	 * @param testStep Cucumber's TestStep object
+	 * @param codeRef  a code reference
 	 * @return Test Case ID entity or null if it's not possible to calculate
 	 */
 	@Nullable
@@ -941,7 +938,17 @@ public abstract class AbstractReporter implements Formatter {
 				.collect(Collectors.toList())).orElse(Collections.emptyList());
 		params.addAll(ofNullable(pickleStepTestStep.getPickleStep().getArgument()).map(a -> IntStream.range(0, a.size()).mapToObj(i -> {
 			gherkin.pickles.Argument arg = a.get(i);
-			String value = arg instanceof PickleString ? ((PickleString) arg).getContent() : arg.toString();
+			String value;
+			if (arg instanceof PickleString) {
+				value = ((PickleString) arg).getContent();
+			} else if (arg instanceof PickleTable) {
+				value = formatDataTable(((PickleTable) arg).getRows()
+						.stream()
+						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
+						.collect(Collectors.toList()));
+			} else {
+				value = arg.toString();
+			}
 			return Pair.of("arg" + i, value);
 		}).collect(Collectors.toList())).orElse(Collections.emptyList()));
 		return ParameterUtils.getParameters(codeRef, params);

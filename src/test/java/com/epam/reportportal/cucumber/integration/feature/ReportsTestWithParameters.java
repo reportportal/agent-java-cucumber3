@@ -20,6 +20,7 @@ import com.epam.reportportal.annotations.ParameterKey;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
+import io.cucumber.datatable.DataTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,5 +61,10 @@ public class ReportsTestWithParameters {
 	@When("I have a step with a named string parameter {string}")
 	public void iHaveANamedStrInlineParameter(@ParameterKey("my name") String str) {
 		LOGGER.info("String parameter {}", str);
+	}
+
+	@Given("a step with a data table:")
+	public void testStep(DataTable dataTable) {
+		LOGGER.info("DataTable parameter:&#13;&#10;{}", dataTable.toString());
 	}
 }

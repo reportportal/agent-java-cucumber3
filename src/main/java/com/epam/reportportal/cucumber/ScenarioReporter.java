@@ -15,12 +15,11 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.utils.MemoizingSupplier;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.HookType;
 import cucumber.api.TestStep;
 import io.reactivex.Maybe;
-import rp.com.google.common.base.Supplier;
-import rp.com.google.common.base.Suppliers;
 
 import javax.annotation.Nonnull;
 import java.util.Calendar;
@@ -52,7 +51,7 @@ public class ScenarioReporter extends AbstractReporter {
 	private static final String RP_TEST_TYPE = "STORY";
 	private static final String RP_STEP_TYPE = "STEP";
 
-	protected Supplier<Maybe<String>> rootSuiteId;
+	protected MemoizingSupplier<Maybe<String>> rootSuiteId;
 
 	@Override
 	protected void beforeLaunch() {
@@ -65,6 +64,15 @@ public class ScenarioReporter extends AbstractReporter {
 		StartTestItemRQ rq = super.buildStartStepRequest(testStep, stepPrefix, keyword);
 		rq.setHasStats(false);
 		return rq;
+	}
+
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		super.beforeStep(testStep);
+		String description = buildMultilineArgument(testStep).trim();
+		if (!description.isEmpty()) {
+			sendLog(description);
+		}
 	}
 
 	@Override
@@ -110,7 +118,7 @@ public class ScenarioReporter extends AbstractReporter {
 	 * Start root suite
 	 */
 	protected void startRootItem() {
-		rootSuiteId = Suppliers.memoize(() -> {
+		rootSuiteId = new MemoizingSupplier<>(() -> {
 			StartTestItemRQ rq = new StartTestItemRQ();
 			rq.setName("Root User Story");
 			rq.setStartTime(Calendar.getInstance().getTime());

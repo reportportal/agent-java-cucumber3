@@ -1,10 +1,13 @@
 # Cucumber3 Agent for ReportPortal
- [ ![Download](https://api.bintray.com/packages/epam/reportportal/agent-java-cucumber3/images/download.svg) ](https://bintray.com/epam/reportportal/agent-java-cucumber3/_latestVersion)
- 
+
+> **DISCLAIMER**: We use Google Analytics for sending anonymous usage information such as agent's and client's names, and their versions
+> after a successful launch start. This information might help us to improve both ReportPortal backend and client sides. It is used by the
+> ReportPortal team only and is not supposed for sharing with 3rd parties.
+
+[![Maven Central](https://img.shields.io/maven-central/v/com.epam.reportportal/agent-java-cucumber3.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22com.epam.reportportal%22%20AND%20a:%22agent-java-cucumber3%22)
 ![CI Build](https://github.com/reportportal/agent-java-cucumber3/workflows/CI%20Build/badge.svg)
 [![Join Slack chat!](https://reportportal-slack-auto.herokuapp.com/badge.svg)](https://reportportal-slack-auto.herokuapp.com)
 [![stackoverflow](https://img.shields.io/badge/reportportal-stackoverflow-orange.svg?style=flat)](http://stackoverflow.com/questions/tagged/reportportal)
-[![UserVoice](https://img.shields.io/badge/uservoice-vote%20ideas-orange.svg?style=flat)](https://rpp.uservoice.com/forums/247117-report-portal)
 [![Build with Love](https://img.shields.io/badge/build%20with-❤%EF%B8%8F%E2%80%8D-lightgrey.svg)](http://reportportal.io?style=flat)
 
 
@@ -15,18 +18,6 @@ Add to POM.xml
 **dependency**
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-<repositories>
-     <repository>
-        <snapshots>
-          <enabled>false</enabled>
-        </snapshots>
-        <id>bintray-epam-reportportal</id>
-        <name>bintray</name>
-        <url>http://dl.bintray.com/epam/reportportal</url>
-     </repository>
-</repositories>
-
-
 <dependency>
   <groupId>com.epam.reportportal</groupId>
   <artifactId>agent-java-cucumber3</artifactId>
