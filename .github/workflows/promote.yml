@@ -78,7 +78,7 @@ jobs:
           verified=false
           for i in `seq 0 ${ATTEMPTS}`; do
             sleep $SLEEP_TIME
-            curl -f -O -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
+            curl -f -s -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
               --header 'Accept: application/json' \
               ${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/repository/${NEXUS_REPOSITORY_NAME} >result.json
 
