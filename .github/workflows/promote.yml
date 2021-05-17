@@ -84,7 +84,7 @@ jobs:
 
             is_closed=`jq -r '.type' result.json`
             is_transitioning=`jq -r '.transitioning' result.json`
-            echo "Current repository status: $result; transitioning: $is_transitioning"
+            echo "Current repository status: $is_closed; transitioning: $is_transitioning"
 
             if [[ "$is_closed" == "closed" && "$is_transitioning" == "false" ]]; then
               verified=true
