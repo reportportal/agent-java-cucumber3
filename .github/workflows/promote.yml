@@ -82,10 +82,11 @@ jobs:
               --header 'Accept: application/json' \
               ${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/repository/${NEXUS_REPOSITORY_NAME} >result.json
 
-            result=`jq -r '.type' result.json`
-            echo "Current repository status: $result"
+            is_closed=`jq -r '.type' result.json`
+            is_transitioning=`jq -r '.transitioning' result.json`
+            echo "Current repository status: $result; transitioning: $is_transitioning"
 
-            if [[ "$result" == "closed" ]]; then
+            if [[ "$is_closed" == "closed" && "$is_transitioning" == "false" ]]; then
               verified=true
               break
             fi
