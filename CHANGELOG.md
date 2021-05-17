@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Table parameter handling for different reporters
 ### Changed
 - Client version updated on [5.0.21](https://github.com/reportportal/client-java/releases/tag/5.0.21)
 ### Fixed
