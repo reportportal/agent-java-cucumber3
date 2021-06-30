@@ -10,6 +10,8 @@
 [![stackoverflow](https://img.shields.io/badge/reportportal-stackoverflow-orange.svg?style=flat)](http://stackoverflow.com/questions/tagged/reportportal)
 [![Build with Love](https://img.shields.io/badge/build%20with-❤%EF%B8%8F%E2%80%8D-lightgrey.svg)](http://reportportal.io?style=flat)
 
+### End of support
+<mark>The agent lifecycle already ended. You are free to use it as long as you prefer, but no new updates will be published.<mark>
 
 ### Installation
 
